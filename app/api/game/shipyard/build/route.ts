@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Player resources not found' }, { status: 404 })
   }
 
-  const resources = playerResources.reduce((acc, r) => {
+  const resources = playerResources.reduce((acc: { [key: string]: number }, r) => {
     acc[r.resource_type] = r.quantity
     return acc
   }, {})
