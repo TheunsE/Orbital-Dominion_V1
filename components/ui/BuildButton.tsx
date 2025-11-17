@@ -1,35 +1,34 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
-import type { BuildingType } from '@/types'
 import { useRouter } from 'next/navigation'
+import type { BuildingType } from '@/types'
 
-export default function BuildButton({ buildingType }: { buildingType: BuildingType }) {
-  const supabase = createClient()
-  const router = useRouter()
+type Props = {
+  buildingType: BuildingType
+  onBuilt: () => void
+}
 
+export default function BuildButton({ buildingType, onBuilt }: Props) {
   const handleBuild = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      alert('You must be logged in to build.')
-      return
-    }
-
-    await fetch('/api/buildings', {
+    const res = await fetch('/api/game/build', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ buildingTypeId: buildingType.id }),
     })
-
-    router.refresh()
+    const data = await res.json()
+    if (res.ok) {
+      alert(data.message)
+      onBuilt()
+    } else {
+      alert(`Error: ${data.error}`)
+    }
   }
 
   return (
-    <button onClick={handleBuild} className="bg-green-500 text-white p-2 rounded">
+    <button
+      onClick={handleBuild}
+      className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded"
+    >
       Build {buildingType.name}
     </button>
   )
