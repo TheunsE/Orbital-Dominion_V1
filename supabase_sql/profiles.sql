@@ -10,14 +10,18 @@ CREATE TABLE public.profiles (
 -- 2. Create the function to handle new user creation
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE random_planet_id int;
 BEGIN
   -- Create a profile for the new user
   INSERT INTO public.profiles (id, email, username)
   VALUES (new.id, new.email, new.raw_user_meta_data->>'username');
 
-  -- Create a player entry for the new user
-  INSERT INTO public.players (id)
-  VALUES (new.id);
+-- Select a random planet for the new user
+  SELECT id INTO random_planet_id FROM public.planets ORDER BY random() LIMIT 1;
+
+-- Create a player entry for the new user
+  INSERT INTO public.players (id, planet_id)
+  VALUES (new.id, random_planet_id);
 
   -- Grant the new player all default resources
   INSERT INTO public.resources (player_id, resource_type, quantity)
