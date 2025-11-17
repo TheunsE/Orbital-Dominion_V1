@@ -22,21 +22,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Technology not found' }, { status: 404 })
   }
 
-  // 2. Check if the player has a Research Lab of the required level
+  // 2. Get the building type ID for 'Research Lab'
+  const { data: researchLabBuildingType, error: buildingTypeError } = await supabase
+    .from('building_types')
+    .select('id')
+    .eq('name', 'Research Lab')
+    .single()
+
+  if (buildingTypeError || !researchLabBuildingType) {
+    return NextResponse.json({ error: 'Research Lab building type not found' }, { status: 404 })
+  }
+  
+  // 3. Check if the player has a Research Lab of the required level
   const { data: researchLab, error: labError } = await supabase
     .from('player_buildings')
     .select('level')
     .eq('player_id', user.id)
-    .eq('building_type_id', (await supabase.from('building_types').select('id').eq('name', 'Research Lab')).data[0].id)
+    .eq('building_type_id', researchLabBuildingType.id)
     .single()
-    
+
   if (labError || !researchLab || researchLab.level < techType.required_lab_level) {
     return NextResponse.json({ error: 'Research Lab level not high enough' }, { status: 400 })
   }
   
-  // 3. (Optional) Check for resource costs for research, if any.
+  // 4. (Optional) Check for resource costs for research, if any.
   
-  // 4. Grant the technology to the player
+  // 5. Grant the technology to the player
   const { error: insertError } = await supabase
     .from('player_techs')
     .insert({ player_id: user.id, tech_type_id: techTypeId })
