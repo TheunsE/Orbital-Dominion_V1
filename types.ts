@@ -12,6 +12,7 @@ export type BuildingType = {
   base_power_generation: number;
   power_generation_per_level: number;
   max_level: number;
+  construction_time_seconds: number;
 };
 
 export type ResourceDefinition = {
@@ -34,6 +35,7 @@ export type PlayerResource = {
 export type PlayerBuilding = {
   id: number;
   level: number;
+  construction_ends_at: string | null; // timestamptz
   building_types: BuildingType;
 }
 
