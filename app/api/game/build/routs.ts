@@ -22,7 +22,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Building type not found' }, { status: 404 })
   }
 
-  // 2. Get player's metal resource
+  // 2. Check building requirements
+  if (buildingType.name !== 'Shelter') {
+    const { data: shelter, error: shelterError } = await supabase
+      .from('player_buildings')
+      .select('id, construction_ends_at, building_types(name)')
+      .eq('player_id', user.id)
+      .single() // Simplified: assumes player has only one shelter
+
+    const shelterType = shelter?.building_types;
+    if (shelterError || !shelter || shelterType?.name !== 'Shelter' || (shelter.construction_ends_at && new Date(shelter.construction_ends_at) > new Date())) {
+      return NextResponse.json({ error: 'A constructed Shelter is required before building other structures.' }, { status: 400 })
+    }
+  }
+  
+  // 3. Get player's metal resource
   const { data: playerResource, error: resourceError } = await supabase
     .from('resources')
     .select('quantity')
@@ -34,14 +48,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Player resource not found' }, { status: 404 })
   }
 
-  // 3. Check if player has enough resources
+  // 4. Check if player has enough resources
   if (playerResource.quantity < buildingType.cost) {
     return NextResponse.json({ error: 'Insufficient resources' }, { status: 400 })
   }
 
-  // 4. Deduct resources and insert new building in a transaction
+  // 5. Deduct resources
   const newQuantity = playerResource.quantity - buildingType.cost
-  
   const { error: updateError } = await supabase
     .from('resources')
     .update({ quantity: newQuantity })
@@ -51,10 +64,18 @@ export async function POST(req: Request) {
   if (updateError) {
     return NextResponse.json({ error: 'Failed to update resources' }, { status: 500 })
   }
-
+  // 6. Insert new building with construction timer
+  const constructionEndsAt = new Date()
+  constructionEndsAt.setSeconds(constructionEndsAt.getSeconds() + buildingType.construction_time_seconds)
+  
   const { error: insertError } = await supabase
     .from('player_buildings')
-    .insert({ player_id: user.id, building_type_id: buildingTypeId, level: 1 })
+    .insert({ 
+      player_id: user.id, 
+      building_type_id: buildingTypeId, 
+      level: 1,
+      construction_ends_at: constructionEndsAt.toISOString()
+    })
 
   if (insertError) {
     // Ideally, you'd roll back the resource update here.
