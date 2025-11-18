@@ -13,6 +13,7 @@ CREATE TABLE public.building_types (
   base_power_generation integer NOT NULL DEFAULT 0,
   power_generation_per_level integer NOT NULL DEFAULT 0,
   max_level integer NOT NULL DEFAULT 10,
+  construction_time_seconds integer NOT NULL DEFAULT 0,
   created_at timestamp with time zone DEFAULT now()
 );
 
@@ -60,6 +61,7 @@ CREATE TABLE public.player_buildings (
   player_id uuid NOT NULL REFERENCES public.players(id) ON DELETE CASCADE,
   building_type_id integer NOT NULL REFERENCES public.building_types(id) ON DELETE CASCADE,
   level integer NOT NULL DEFAULT 1,
+  construction_ends_at timestamptz,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT level_cap CHECK (level <= 10)
 );
