@@ -1,4 +1,4 @@
-use client'
+'use client'
 import type { BuildingType } from '@/types'
 
 type Props = {
