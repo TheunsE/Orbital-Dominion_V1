@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   // 1. Get building cost
   const { data: buildingType, error: buildingError } = await supabase
     .from('building_types')
-    .select('cost')
+    .select('id, name, cost, construction_time_seconds')
     .eq('id', buildingTypeId)
     .single()
 
