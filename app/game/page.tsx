@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { PlayerResource, PlayerBuilding, BuildingType, ShipType, PlayerShip, TechType, PlayerTech } from '@/types'
 import BuildButton from '@/components/ui/BuildButton'
 import UpgradeButton from '@/components/ui/UpgradeButton'
+import CountdownTimer from '@/components/ui/CountdownTimer'
 
 export default function Game() {
   const supabase = createClient()
@@ -16,6 +17,7 @@ export default function Game() {
   const [buildingTypes, setBuildingTypes] = useState<BuildingType[]>([])
   const [shipTypes, setShipTypes] = useState<ShipType[]>([])
   const [techTypes, setTechTypes] = useState<TechType[]>([])
+  const [hasShelter, setHasShelter] = useState(false)
 
   const fetchGameData = async (userId: string) => {
     const { data: resourcesData } = await supabase.from('resources').select('*').eq('player_id', userId)
@@ -23,6 +25,9 @@ export default function Game() {
 
     const { data: buildingsData } = await supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', userId)
     setBuildings(buildingsData || [])
+    
+    const shelter = buildingsData?.find(b => b.building_types.name === 'Shelter' && (!b.construction_ends_at || new Date(b.construction_ends_at) <= new Date()))
+    setHasShelter(!!shelter)
 
     const { data: shipsData } = await supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', userId)
     setShips(shipsData || [])
@@ -51,7 +56,13 @@ export default function Game() {
     }
     init()
     fetchGameTypes()
-  }, [])
+    
+    const interval = setInterval(() => {
+        if (user) fetchGameData(user.id);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [user])
 
   const handleGameUpdate = () => {
     if (user) {
@@ -103,13 +114,16 @@ export default function Game() {
                 <li key={b.id} className="bg-slate-800 p-3 rounded-lg flex justify-between items-center">
                   <div>
                     <p className="font-bold">{b.building_types.name} (Level {b.level})</p>
-                    <p className="text-sm text-slate-400">
-                      {b.building_types.base_production > 0 && `Production: ${b.building_types.base_production * (1 + (b.level - 1) * b.building_types.production_bonus_per_level)}/hr `}
-                      {b.building_types.base_storage > 0 && `Storage: ${b.building_types.base_storage * (1 + (b.level - 1) * b.building_types.storage_bonus_per_level)} `}
-                      {b.building_types.base_power_generation > 0 && `Power: ${b.level * b.building_types.power_generation_per_level}`}
-                    </p>
+                    { b.construction_ends_at && new Date(b.construction_ends_at) > new Date() ?
+                        <CountdownTimer endDate={new Date(b.construction_ends_at)} /> :
+                        <p className="text-sm text-slate-400">
+                          {b.building_types.base_production > 0 && `Production: ${b.building_types.base_production * (1 + (b.level - 1) * b.building_types.production_bonus_per_level)}/hr `}
+                          {b.building_types.base_storage > 0 && `Storage: ${b.building_types.base_storage * (1 + (b.level - 1) * b.building_types.storage_bonus_per_level)} `}
+                          {b.building_types.base_power_generation > 0 && `Power: ${b.level * b.building_types.power_generation_per_level}`}
+                        </p>
+                    }
                   </div>
-                  <UpgradeButton playerBuildingId={b.id} onUpgraded={handleGameUpdate} />
+                  { !b.construction_ends_at || new Date(b.construction_ends_at) <= new Date() && <UpgradeButton playerBuildingId={b.id} onUpgraded={handleGameUpdate} /> }
                 </li>
               ))}
             </ul>
@@ -117,7 +131,7 @@ export default function Game() {
            <div>
             <h3 className="text-2xl font-semibold text-emerald-400">Construct</h3>
             <div className="flex flex-wrap gap-2">
-              {buildingTypes.map((bt) => (
+              {buildingTypes.filter(bt => hasShelter ? bt.name !== 'Shelter' : bt.name === 'Shelter').map((bt) => (
                 <BuildButton key={bt.id} buildingType={bt} onBuilt={handleGameUpdate} />
               ))}
             </div>
