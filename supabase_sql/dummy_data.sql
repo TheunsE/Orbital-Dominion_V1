@@ -1,4 +1,4 @@
-- Seed resource definitions
+-- Seed resource definitions
 INSERT INTO public.resource_definitions (name, description) VALUES
 ('Oxygen', 'Essential for survival.'),
 ('Food', 'Sustains colonists.'),
