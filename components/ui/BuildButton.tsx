@@ -1,6 +1,4 @@
-'use client'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+use client'
 import type { BuildingType } from '@/types'
 
 type Props = {
