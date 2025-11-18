@@ -1,22 +1,32 @@
--- =============================================
--- PROFILES TABLE + ROBUST NEW USER TRIGGER
--- =============================================
+-- =====================================================
+-- COMPLETE & SAFE profiles.sql – RUN THIS EXACTLY AS-IS
+-- =====================================================
 
--- 1. Ensure profiles table has proper constraints
+-- 1. Create the profiles table (only if it doesn't exist)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id uuid NOT NULL PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username text NOT NULL,
+  email text,
+  role text DEFAULT 'player'::text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+-- 2. Now we can safely add the unique constraints
 ALTER TABLE public.profiles 
   ADD CONSTRAINT profiles_username_key UNIQUE (username),
   ADD CONSTRAINT profiles_email_key UNIQUE (email);
 
--- Recommended: case-insensitive unique indexes (prevents Player1 vs player1)
-DROP INDEX IF EXISTS profiles_username_lower_idx;
+-- 3. Case-insensitive unique indexes (prevents Player1 vs player1)
+DROP INDEX IF EXISTS public.profiles_username_lower_idx;
 CREATE UNIQUE INDEX profiles_username_lower_idx 
-ON public.profiles (lower(username));
+  ON public.profiles (lower(username));
 
-DROP INDEX IF EXISTS profiles_email_lower_idx;
+DROP INDEX IF EXISTS public.profiles_email_lower_idx;
 CREATE UNIQUE INDEX profiles_email_lower_idx 
-ON public.profiles (lower(email));
+  ON public.profiles (lower(email));
 
--- 2. The ultimate handle_new_user() function
+-- 4. The bulletproof handle_new_user() function
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE 
@@ -26,40 +36,35 @@ DECLARE
   final_username text;
   counter int := 0;
 BEGIN
-  -- Extract username from metadata
+  -- Extract and clean username
   raw_username := trim(COALESCE(new.raw_user_meta_data ->> 'username', ''));
 
-  -- Generate base username
   IF raw_username = '' OR raw_username IS NULL THEN
     base_username := 'player_' || substr(md5(new.id::text), 1, 8);
   ELSE
-    -- Clean: only letters, numbers, underscores
     base_username := lower(regexp_replace(raw_username, '[^a-zA-Z0-9_]', '', 'g'));
     IF length(base_username) < 3 THEN
       base_username := 'user_' || substr(md5(new.id::text), 1, 8);
     END IF;
   END IF;
 
-  -- Try to insert profile with unique username
+  -- Ensure unique username
   LOOP
     final_username := base_username || CASE WHEN counter > 0 THEN counter::text ELSE '' END;
 
     BEGIN
       INSERT INTO public.profiles (id, email, username)
       VALUES (new.id, lower(new.email), final_username);
-
-      EXIT; -- Success!
+      EXIT;
 
     EXCEPTION WHEN unique_violation THEN
-      IF SQLERRM LIKE '%profiles_username_lower_idx%' OR SQLERRM LIKE '%profiles_username_key%' THEN
+      IF SQLERRM LIKE '%profiles_username%' THEN
         counter := counter + 1;
         IF counter > 100 THEN
-          -- Last resort: super unique
           base_username := 'user_' || substr(md5(new.id::text || now()::text), 1, 12);
           counter := 0;
         END IF;
       ELSE
-        -- Probably email already exists → block signup
         RAISE EXCEPTION 'Email already in use';
       END IF;
     END;
@@ -74,7 +79,7 @@ BEGIN
   VALUES (new.id, random_planet_id)
   ON CONFLICT (id) DO NOTHING;
 
-  -- Give starting resources
+  -- Starting resources
   INSERT INTO public.resources (player_id, resource_type, quantity)
   VALUES 
     (new.id, 'Oxygen', 100),
@@ -88,8 +93,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 3. Recreate the trigger (just in case)
+-- 5. Recreate the trigger
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Done!
