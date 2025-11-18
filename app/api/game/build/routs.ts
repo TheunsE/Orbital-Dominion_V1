@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       .single() // Simplified: assumes player has only one shelter
 
     const shelterType = shelter?.building_types;
-    if (shelterError || !shelter || shelterType?.name !== 'Shelter' || (shelter.construction_ends_at && new Date(shelter.construction_ends_at) > new Date())) {
+    if (shelterError || !shelter || shelterType?.[0]?.name !== 'Shelter' || (shelter.construction_ends_at && new Date(shelter.construction_ends_at) > new Date())) {
       return NextResponse.json({ error: 'A constructed Shelter is required before building other structures.' }, { status: 400 })
     }
   }
