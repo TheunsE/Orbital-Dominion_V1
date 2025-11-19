@@ -101,12 +101,12 @@ export default function Game() {
   
   const handleGameUpdate = () => {
     if (user) {
-      fetchGameData(user.id)
+      fetchGameData(user.id);
     }
-  }
+  };
 
   if (loading) {
-    return <div>Loading...</div>
+    return (<div>Loading...</div>);
   } 
   if (!user) {
     return (
