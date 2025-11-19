@@ -105,13 +105,17 @@ export default function Game() {
     }
   }
 
-  if (loading) return (<div>Loading...</div>) 
-  if (!user) return (
+  if (loading) {
+    return <div>Loading...</div>
+  } 
+  if (!user) {
+    return (
     <div className="text-center mt-10">
       Please <a href="/auth/signin" className="text-emerald-400">sign in</a>.
-  </div>
-  )
-
+    </div>
+    )
+  }
+  
   return (
     <div className="space-y-6 p-4">
       <h2 className="text-3xl font-bold text-emerald-300">Game Dashboard</h2>
