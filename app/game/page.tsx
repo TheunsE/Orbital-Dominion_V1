@@ -5,6 +5,7 @@ import type { PlayerResource, PlayerBuilding, BuildingType, ShipType, PlayerShip
 import BuildButton from '@/components/ui/BuildButton'
 import UpgradeButton from '@/components/ui/UpgradeButton'
 import CountdownTimer from '@/components/ui/CountdownTimer'
+import Message from '@/components/ui/Message'
 
 export default function Game() {
   const supabase = createClient()
@@ -18,6 +19,8 @@ export default function Game() {
   const [shipTypes, setShipTypes] = useState<ShipType[]>([])
   const [techTypes, setTechTypes] = useState<TechType[]>([])
   const [hasShelter, setHasShelter] = useState(false)
+  const [isBuilding, setIsBuilding] = useState(false)
+  const [currentMessages, setCurrentMessages] = useState<string[]>([])
 
   const fetchGameData = async (userId: string) => {
     const { data: resourcesData } = await supabase.from('resources').select('*').eq('player_id', userId)
@@ -29,6 +32,9 @@ export default function Game() {
     const shelter = buildingsData?.find(b => b.building_types.name === 'Shelter' && (!b.construction_ends_at || new Date(b.construction_ends_at) <= new Date()))
     setHasShelter(!!shelter)
 
+    const currentlyBuilding = buildingsData?.some(b => b.construction_ends_at && new Date(b.construction_ends_at) > new Date())
+    setIsBuilding(currentlyBuilding)
+    
     const { data: shipsData } = await supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', userId)
     setShips(shipsData || [])
     
@@ -64,6 +70,35 @@ export default function Game() {
     return () => clearInterval(interval);
   }, [user])
 
+  useEffect(() => {
+    const hasBuilding = (name: string) => buildings.some(b => b.building_types.name === name && (!b.construction_ends_at || new Date(b.construction_ends_at) <= new Date()));
+
+    const storyMessage = "The year is 2242. You are the commander of a small colonization vessel, sent to establish a new human presence on a distant exoplanet. After a long and arduous journey, you have finally arrived, but your vessel has sustained critical damage during atmospheric entry. You and your crew have managed to crash-land on the planet, but the ship is beyond repair.";
+    const shelterMessage = "Your first priority is to establish a basic shelter to protect your crew from the harsh alien environment. Construct a Shelter to begin.";
+    const metalMineMessage = "Excellent work, Commander. With the shelter in place, you can now turn your attention to resource acquisition. You will need Metal to construct more advanced buildings. Build a Metal Mine to begin extracting this vital resource.";
+    const solarPanelsMessage = "Now that you have a steady supply of Metal, you will need to power your growing colony. Construct Solar Panels to generate the energy required for your buildings to operate.";
+    const oxygenExtractorMessage = "With power secured, you must now address the issue of breathable air. The planet's atmosphere is thin and rich in carbon dioxide, but it contains trace amounts of oxygen that can be extracted. Build an Oxygen Extractor to provide your crew with a sustainable source of breathable air.";
+    const farmMessage = "Your crew cannot survive on recycled nutrient paste forever. You must establish a sustainable food source. Build a Farm to cultivate crops and provide your colonists with fresh food.";
+
+    const hasCompletedBuildings = buildings.some(b => !b.construction_ends_at || new Date(b.construction_ends_at) <= new Date());
+    if (!hasCompletedBuildings) {
+        setCurrentMessages([storyMessage, shelterMessage]);
+        return;
+    }
+    
+    if (hasBuilding('Shelter') && !hasBuilding('Metal Mine')) {
+        setCurrentMessages([metalMineMessage]);
+    } else if (hasBuilding('Metal Mine') && !hasBuilding('Solar Panels')) {
+        setCurrentMessages([solarPanelsMessage]);
+    } else if (hasBuilding('Solar Panels') && !hasBuilding('Oxygen Extractor')) {
+        setCurrentMessages([oxygenExtractorMessage]);
+    } else if (hasBuilding('Oxygen Extractor') && !hasBuilding('Farm')) {
+        setCurrentMessages([farmMessage]);
+    } else {
+        setCurrentMessages([]);
+    }
+  }, [buildings]);
+  
   const handleGameUpdate = () => {
     if (user) {
       fetchGameData(user.id)
@@ -77,6 +112,8 @@ export default function Game() {
     <div className="space-y-6 p-4">
       <h2 className="text-3xl font-bold text-emerald-300">Game Dashboard</h2>
       <p className="text-slate-400">Welcome, {user.email}</p>
+      
+      {currentMessages.length > 0 && <Message messages={currentMessages} />}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-4">
@@ -131,8 +168,15 @@ export default function Game() {
            <div>
             <h3 className="text-2xl font-semibold text-emerald-400">Construct</h3>
             <div className="flex flex-wrap gap-2">
-              {buildingTypes.filter(bt => hasShelter ? bt.name !== 'Shelter' : bt.name === 'Shelter').map((bt) => (
-                <BuildButton key={bt.id} buildingType={bt} onBuilt={handleGameUpdate} />
+              {buildingTypes.map((bt) => {
+                const isShelter = bt.name === 'Shelter'
+                const existingBuilding = buildings.find(b => b.building_type_id === bt.id)
+                const disabled = existingBuilding || isBuilding || (!isShelter && !hasShelter)
+                const disabledText = existingBuilding ? 'Already Built' : isBuilding ? 'Construction in Progress' : 'Requires Shelter'
+                
+                if (isShelter && hasShelter) return null
+                
+                return <BuildButton key={bt.id} buildingType={bt} onBuilt={handleGameUpdate} disabled={disabled} disabledText={disabledText} />
               ))}
             </div>
           </div>
