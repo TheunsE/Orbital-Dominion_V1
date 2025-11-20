@@ -53,9 +53,16 @@ export default function Game() {
     )
     setHasShelter(!!shelter)
 
-    const currentlyBuilding = buildingsData?.some(
-      b => b.construction_ends_at && new Date(b.construction_ends_at) > new Date()
-    )
+    const currentlyBuilding = buildingsData?.some(b => {
+  if (!b.construction_ends_at) return false
+
+  const end = new Date(b.construction_ends_at)
+
+  // Only treat it as "under construction" if:
+  // 1. It is a valid date
+  // 2. The end time is in the future
+  return !isNaN(end.getTime()) && end > new Date()
+})
     setIsBuilding(!!currentlyBuilding)
 
     const { data: shipsData } = await supabase
