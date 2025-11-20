@@ -182,7 +182,7 @@ export default function Game() {
   // ------------------------------------------
   // RENDER
   // ------------------------------------------
-  if (loading) return <div>Loading...</div>
+  if (loading) return (<div>Loading...</div>)
 
   if (!user)
     return (
@@ -336,4 +336,4 @@ export default function Game() {
       </div>
     </div>
   )
-           }
+}
