@@ -56,7 +56,7 @@ export default function Game() {
     const currentlyBuilding = buildingsData?.some(
       b => b.construction_ends_at && new Date(b.construction_ends_at) > new Date()
     )
-    setIsBuilding(currentlyBuilding)
+    setIsBuilding(!!currentlyBuilding)
 
     const { data: shipsData } = await supabase
       .from('player_ships')
@@ -306,8 +306,7 @@ export default function Game() {
                 const isShelter = bt.name === 'Shelter'
                 const existingBuilding = buildings.find(b => b.building_type_id === bt.id)
 
-                const disabled =
-                  existingBuilding || isBuilding || (!isShelter && !hasShelter)
+                const disabled = !!(existingBuilding || isBuilding || (!isShelter && !hasShelter)
 
                 const disabledText =
                   existingBuilding
