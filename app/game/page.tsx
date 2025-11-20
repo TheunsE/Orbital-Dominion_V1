@@ -304,7 +304,7 @@ export default function Game() {
             <div className="flex flex-wrap gap-2">
               {buildingTypes.map(bt => {
                 const isShelter = bt.name === 'Shelter'
-                const existingBuilding = buildings.find(b => b.building_type_id === bt.id)
+                const existingBuilding = buildings.find(b => b.building_type.id === bt.id)
 
                 const disabled = !!(existingBuilding || isBuilding || (!isShelter && !hasShelter))
 
