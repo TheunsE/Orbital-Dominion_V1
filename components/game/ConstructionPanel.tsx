@@ -1,4 +1,4 @@
-import type { BuildingType, PlayerBuilding, ResourceDefinition } from '@/types'
+import type { BuildingType, PlayerBuilding, Resource } from '@/types'
 import BuildButton from '@/components/ui/BuildButton'
 
 type Props = {
