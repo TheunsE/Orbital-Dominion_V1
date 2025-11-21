@@ -45,8 +45,7 @@ export default function BuildButton({
     <Button
       onClick={onBuilt}
       disabled={isDisabled}
-      className="w-full text-left"
-      variant={isDisabled ? 'secondary' : 'default'}
+      className={`w-full text-left ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <div>
         {/* Building name */}
