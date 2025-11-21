@@ -7,22 +7,37 @@ import { hasSufficientResources } from '@/lib/game-logic'
 interface UpgradeButtonProps {
   playerBuilding: PlayerBuilding
   resources: Resource[]
-  onUpgrade: (playerBuildingId: number) => void
+  onUpgrade?: (playerBuildingId: number) => void
+  onUpgraded?: () => void
 }
 
 const UpgradeButton = ({
   playerBuilding,
   resources,
   onUpgrade,
+  onUpgraded,
 }: UpgradeButtonProps) => {
   const handleUpgradeClick = () => {
-    onUpgrade(playerBuilding.id)
+    // Trigger legacy callback (with ID)
+    onUpgrade?.(playerBuilding.id)
+
+    // Trigger new callback (no ID)
+    onUpgraded?.()
   }
 
   const upgradeCost = {
-    metal: Math.floor(playerBuilding.building_types.cost_metal * Math.pow(1.5, playerBuilding.level)),
-    crystal: Math.floor(playerBuilding.building_types.cost_crystal * Math.pow(1.5, playerBuilding.level)),
-    food: Math.floor(playerBuilding.building_types.cost_food * Math.pow(1.5, playerBuilding.level)),
+    metal: Math.floor(
+      playerBuilding.building_types.cost_metal *
+        Math.pow(1.5, playerBuilding.level)
+    ),
+    crystal: Math.floor(
+      playerBuilding.building_types.cost_crystal *
+        Math.pow(1.5, playerBuilding.level)
+    ),
+    food: Math.floor(
+      playerBuilding.building_types.cost_food *
+        Math.pow(1.5, playerBuilding.level)
+    ),
   }
 
   const costs = [
@@ -37,11 +52,11 @@ const UpgradeButton = ({
     return costs
       .filter((cost) => {
         const resource = resources.find(
-          (r) => r.resource_type === cost.resource_type,
+          (r) => r.resource_type === cost.resource_type
         )
         return !resource || resource.quantity < cost.cost
       })
-      .map((cost) => `${cost.cost} ${cost.resource_type}`)
+      .map((c) => `${c.cost} ${c.resource_type}`)
       .join(', ')
   }
 
