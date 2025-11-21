@@ -69,6 +69,20 @@ export interface PlayerShip {
   ship_type_id: number
   quantity: number
   created_at: string
+  ship_types: {
+    id: number
+    name: string
+    tier: number
+    role: string
+    metal_cost: number
+    food_cost: number
+    energy_cost: number
+    attack: number
+    defense: number
+    speed: number
+    hp: number
+    crew_food_per_hour: number
+  }
 }
 
 export interface TechType {
