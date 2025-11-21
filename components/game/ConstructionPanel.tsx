@@ -4,7 +4,7 @@ import BuildButton from '@/components/ui/BuildButton'
 type Props = {
   buildingTypes: BuildingType[]
   buildings: PlayerBuilding[]
-  resources: ResourceDefinition[]
+  resources: Resource[]
   isBuilding: boolean
   hasShelter: boolean
   onGameUpdate: () => void
