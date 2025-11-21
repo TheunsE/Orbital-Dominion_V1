@@ -15,7 +15,7 @@ export default function Game() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
-  const [resources, setResources] = useState<ResourceDefinition[]>([])
+  const [playerResources, setPlayerResources] = useState<Resource[]>([])
   const [buildings, setBuildings] = useState<PlayerBuilding[]>([])
   const [ships, setShips] = useState<PlayerShip[]>([])
   const [techs, setTechs] = useState<PlayerTech[]>([])
