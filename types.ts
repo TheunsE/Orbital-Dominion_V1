@@ -23,7 +23,7 @@ export interface BuildingType {
 export interface ResourceDefinition {
   id: number
   player_id: string
-  name: string
+  resource_type: string
   quantity: number
   created_at: string
 }
