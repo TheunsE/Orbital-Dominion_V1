@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { ResourceDefinition, PlayerBuilding, BuildingType, ShipType, PlayerShip, TechType, PlayerTech, Resource } from '@/types'
+import type { Resource, PlayerBuilding, BuildingType, ShipType, PlayerShip, TechType, PlayerTech } from '@/types'
 import Message from '@/components/ui/Message'
 import ResourcesPanel from '@/components/game/ResourcesPanel'
 import FleetPanel from '@/components/game/FleetPanel'
@@ -38,7 +38,7 @@ export default function Game() {
       .select('*')
       .eq('player_id', userId)
 
-    setResources(resourcesData || [])
+    setPlayerResources(resourcesData || [])
 
     const { data: buildingsData } = await supabase
       .from('player_buildings')
