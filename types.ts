@@ -28,6 +28,13 @@ export interface PlayerResource {
   created_at: string
 }
 
+
+export type PlayerAccount = {
+  id: string;
+  email: string;
+  role: string;
+}
+
 export interface PlayerBuilding {
   id: number
   player_id: string
