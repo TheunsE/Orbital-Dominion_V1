@@ -1,6 +1,10 @@
-// types.ts
-// This file defines ALL TypeScript interfaces used across the game
-// It must EXACTLY match what Supabase returns when you use joins (*, building_types(*), ship_types(*), etc.)
+export interface PlayerAccount {
+  id: string
+  username: string
+  email: string | null
+  role: string
+  created_at: string
+}
 
 export interface BuildingType {
   id: number
