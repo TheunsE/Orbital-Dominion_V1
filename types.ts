@@ -52,6 +52,23 @@ export interface ResourceDefinition {
   created_at: string
 }
 
+export interface ShipType {
+  id: number
+  name: string
+  tier: number
+  role: string | null
+  unlock_requirement: any
+  metal_cost: number
+  food_cost: number
+  energy_cost: number
+  attack: number
+  defense: number
+  speed: number
+  hp: number
+  crew_food_per_hour: number
+  created_at: string
+}
+
 // This is what comes back from: SELECT *, ship_types(*) FROM player_ships
 export interface PlayerShip {
   id: number
