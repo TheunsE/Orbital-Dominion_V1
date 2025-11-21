@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { BuildingType } from '@/types'
 
 const AdminBuildingTypes = () => {
+  const supabase = createClient()
   const [buildingTypes, setBuildingTypes] = useState<BuildingType[]>([])
   const [name, setName] = useState('')
   const [costMetal, setCostMetal] = useState(0)
