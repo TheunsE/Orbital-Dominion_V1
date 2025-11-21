@@ -1,10 +1,10 @@
-import type { PlayerBuilding, ResourceDefinition } from '@/types'
+import type { PlayerBuilding, Resource } from '@/types'
 import UpgradeButton from '@/components/ui/UpgradeButton'
 import CountdownTimer from '@/components/ui/CountdownTimer'
 
 type Props = {
   buildings: PlayerBuilding[]
-  resources: ResourceDefinition[]
+  resources: Resource[]
   onGameUpdate: () => void
 }
 
