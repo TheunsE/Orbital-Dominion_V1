@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { ResourceDefinition, PlayerBuilding, BuildingType, ShipType, PlayerShip, TechType, PlayerTech } from '@/types'
+import type { ResourceDefinition, PlayerBuilding, BuildingType, ShipType, PlayerShip, TechType, PlayerTech, Resource } from '@/types'
 import Message from '@/components/ui/Message'
 import ResourcesPanel from '@/components/game/ResourcesPanel'
 import FleetPanel from '@/components/game/FleetPanel'
