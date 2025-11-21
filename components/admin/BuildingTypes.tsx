@@ -1,62 +1,86 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import type { BuildingType } from '@/types'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { BuildingType } from '@/types'
 
-export default function BuildingTypes() {
-  const supabase = createClient()
+const AdminBuildingTypes = () => {
   const [buildingTypes, setBuildingTypes] = useState<BuildingType[]>([])
   const [name, setName] = useState('')
-  const [cost, setCost] = useState(0)
+  const [costMetal, setCostMetal] = useState(0)
+  const [costCrystal, setCostCrystal] = useState(0)
+  const [costFood, setCostFood] = useState(0)
 
   useEffect(() => {
     fetchBuildingTypes()
   }, [])
 
   const fetchBuildingTypes = async () => {
-    const { data } = await supabase.from('building_types').select('*')
-    setBuildingTypes(data || [])
+    const { data, error } = await supabase.from('building_types').select('*')
+    if (data) setBuildingTypes(data)
   }
 
-  const handleAdd = async () => {
-    await supabase.from('building_types').insert({ name, cost })
+  const handleAddBuilding = async () => {
+    await supabase.from('building_types').insert({ name, cost_metal: costMetal, cost_crystal: costCrystal, cost_food: costFood })
     fetchBuildingTypes()
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDeleteBuilding = async (id: number) => {
     await supabase.from('building_types').delete().eq('id', id)
     fetchBuildingTypes()
   }
 
   return (
-    <div>
-      <h2 className="text-xl font-bold">Building Types</h2>
-      <div className="flex gap-2 mt-4">
+    <div className="p-4 bg-gray-800 text-white">
+      <h2 className="text-xl mb-4">Building Types</h2>
+      <div className="flex gap-2 mb-4">
         <input
           type="text"
           placeholder="Name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="p-2 rounded"
+          className="bg-gray-700 p-2 rounded"
         />
         <input
           type="number"
-          placeholder="Cost"
-          value={cost}
-          onChange={(e) => setCost(Number(e.target.value))}
-          className="p-2 rounded"
+          placeholder="Metal Cost"
+          value={costMetal}
+          onChange={(e) => setCostMetal(Number(e.target.value))}
+          className="bg-gray-700 p-2 rounded"
         />
-        <button onClick={handleAdd} className="bg-blue-500 text-white p-2 rounded">
-          Add
+        <input
+          type="number"
+          placeholder="Crystal Cost"
+          value={costCrystal}
+          onChange={(e) => setCostCrystal(Number(e.target.value))}
+          className="bg-gray-700 p-2 rounded"
+        />
+        <input
+          type="number"
+          placeholder="Food Cost"
+          value={costFood}
+          onChange={(e) => setCostFood(Number(e.target.value))}
+          className="bg-gray-700 p-2 rounded"
+        />
+        <button
+          onClick={handleAddBuilding}
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Add Building
         </button>
       </div>
-      <ul className="mt-4">
+      <ul>
         {buildingTypes.map((bt) => (
-          <li key={bt.id} className="flex justify-between items-center p-2 border-b">
+          <li
+            key={bt.id}
+            className="flex justify-between items-center bg-gray-700 p-2 rounded mb-2"
+          >
             <span>
-              {bt.name} - {bt.cost}
+              {bt.name} - Metal: {bt.cost_metal}, Crystal: {bt.cost_crystal}, Food: {bt.cost_food}
             </span>
-            <button onClick={() => handleDelete(bt.id)} className="bg-red-500 text-white p-1 rounded">
+            <button
+              onClick={() => handleDeleteBuilding(bt.id)}
+              className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded"
+            >
               Delete
             </button>
           </li>
@@ -65,3 +89,5 @@ export default function BuildingTypes() {
     </div>
   )
 }
+
+export default AdminBuildingTypes
