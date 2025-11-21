@@ -114,4 +114,11 @@ export interface PlayerTech {
   player_id: string
   tech_type_id: number
   created_at: string
+  tech_types: {
+    id: number
+    name: string
+    unlocks: string | null
+    required_lab_level: number
+    created_at: string
+  }
 }
