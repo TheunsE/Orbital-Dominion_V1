@@ -7,8 +7,10 @@ import { hasSufficientResources } from '@/lib/game-logic'
 interface BuildButtonProps {
   buildingType: BuildingType
   resources: Resource[]
+  // Optional: used by ConstructionPanel to block Shelter requirement, already built, etc.
   disabled?: boolean
   disabledText?: string
+  // Called when player clicks "Build" and has enough resources
   onBuilt: () => void
 }
 
@@ -19,31 +21,47 @@ export default function BuildButton({
   disabledText = '',
   onBuilt,
 }: BuildButtonProps) {
+  // Define exact costs for this building (level 1)
   const costs = [
-    { resource_type: 'metal', cost: buildingType.cost_metal },
-    { resource_type: 'crystal', cost: buildingType.cost_crystal },
-    { resource_type: 'food', cost: buildingType.cost_food },
+    { resource_type: 'metal' as const, cost: buildingType.cost_metal },
+    { resource_type: 'crystal' as const, cost: buildingType.cost_crystal },
+    { resource_type: 'food' as const, cost: buildingType.cost_food },
   ]
 
-  const sufficientResources = hasSufficientResources(resources, costs)
-  const isDisabled = disabled || !sufficientResources
+  // Check if player can afford it
+  const canAfford = hasSufficientResources(resources, costs)
 
-  const reason = disabled && disabledText ? disabledText : 'Not enough resources'
+  // Final disabled state: either manually disabled OR can't afford
+  const isDisabled = disabled || !canAfford
+
+  // What message to show when disabled
+  const reason = disabled && disabledText
+    ? disabledText
+    : !canAfford
+    ? 'Not enough resources'
+    : ''
 
   return (
     <Button
       onClick={onBuilt}
       disabled={isDisabled}
-      className="w-full relative"
+      className="w-full text-left"
+      variant={isDisabled ? 'secondary' : 'default'}
     >
       <div>
-        <span>Build {buildingType.name}</span>
-        <div className="text-xs">
-          Cost: {buildingType.cost_metal} Metal, {buildingType.cost_crystal} Crystal,{' '}
-          {buildingType.cost_food} Food
+        {/* Building name */}
+        <div className="font-semibold">Build {buildingType.name}</div>
+
+        {/* Cost display */}
+        <div className="text-xs opacity-80">
+          Cost: {buildingType.cost_metal.toLocaleString()} Metal |{' '}
+          {buildingType.cost_crystal.toLocaleString()} Crystal |{' '}
+          {buildingType.cost_food.toLocaleString()} Food
         </div>
-        {isDisabled && (
-          <div className="text-xs text-red-500 font-medium">
+
+        {/* Show why it's disabled */}
+        {isDisabled && reason && (
+          <div className="text-xs text-red-400 font-medium mt-1">
             {reason}
           </div>
         )}
