@@ -20,7 +20,7 @@ export interface BuildingType {
   created_at: string
 }
 
-export interface Resource {
+export interface PlayerResource {
   id: number
   player_id: string
   resource_type: string
