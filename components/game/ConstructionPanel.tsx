@@ -1,10 +1,10 @@
-import type { BuildingType, PlayerBuilding, PlayerResource } from '@/types'
+import type { BuildingType, PlayerBuilding, ResourceDefinition } from '@/types'
 import BuildButton from '@/components/ui/BuildButton'
 
 type Props = {
   buildingTypes: BuildingType[]
   buildings: PlayerBuilding[]
-  resources: PlayerResource[]
+  resources: ResourceDefinition[]
   isBuilding: boolean
   hasShelter: boolean
   onGameUpdate: () => void
