@@ -2,11 +2,9 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-import type { Database } from '@/lib/database.types'
-
 export async function POST(req: Request) {
   const { playerBuildingId } = await req.json()
-  const supabase = createRouteHandlerClient<Database>({ cookies })
+  const supabase = createRouteHandlerClient({ cookies })
 
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
