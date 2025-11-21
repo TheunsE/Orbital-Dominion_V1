@@ -1,24 +1,24 @@
 'use client'
 
-import { BuildingType, Resource } from '@/types'
-import { Button } from './button'
+import type { BuildingType, Resource } from '@/types'
+import { Button } from '@/components/ui/button'
 import { hasSufficientResources } from '@/lib/game-logic'
 
 interface BuildButtonProps {
   buildingType: BuildingType
   resources: Resource[]
-  onBuild: (buildingName: string) => void
+  disabled?: boolean
+  disabledText?: string
+  onBuilt: () => void
 }
 
-const BuildButton = ({
+export default function BuildButton({
   buildingType,
   resources,
-  onBuild,
-}: BuildButtonProps) => {
-  const handleBuildClick = () => {
-    onBuild(buildingType.name)
-  }
-
+  disabled = false,
+  disabledText = '',
+  onBuilt,
+}: BuildButtonProps) {
   const costs = [
     { resource_type: 'metal', cost: buildingType.cost_metal },
     { resource_type: 'crystal', cost: buildingType.cost_crystal },
@@ -26,39 +26,28 @@ const BuildButton = ({
   ]
 
   const sufficientResources = hasSufficientResources(resources, costs)
+  const isDisabled = disabled || !sufficientResources
 
-  const getMissingResources = () => {
-    return costs
-      .filter((cost) => {
-        const resource = resources.find(
-          (r) => r.resource_type === cost.resource_type,
-        )
-        return !resource || resource.quantity < cost.cost
-      })
-      .map((cost) => `${cost.cost} ${cost.resource_type}`)
-      .join(', ')
-  }
+  const reason = disabled && disabledText ? disabledText : 'Not enough resources'
 
   return (
     <Button
-      onClick={handleBuildClick}
-      disabled={!sufficientResources}
-      className="w-full"
+      onClick={onBuilt}
+      disabled={isDisabled}
+      className="w-full relative"
     >
       <div>
         <span>Build {buildingType.name}</span>
         <div className="text-xs">
-          Cost: {buildingType.cost_metal} Metal, {buildingType.cost_crystal}{' '}
-          Crystal, {buildingType.cost_food} Food
+          Cost: {buildingType.cost_metal} Metal, {buildingType.cost_crystal} Crystal,{' '}
+          {buildingType.cost_food} Food
         </div>
-        {!sufficientResources && (
-          <div className="text-xs text-red-500">
-            Missing: {getMissingResources()}
+        {isDisabled && (
+          <div className="text-xs text-red-500 font-medium">
+            {reason}
           </div>
         )}
       </div>
     </Button>
   )
 }
-
-export default BuildButton
