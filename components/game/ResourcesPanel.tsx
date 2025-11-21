@@ -1,7 +1,7 @@
-import type { PlayerResource } from '@/types'
+import type { ResourceDefinition } from '@/types'
 
 type Props = {
-  resources: PlayerResource[]
+  resources: ResourceDefinition[]
 }
 
 export default function ResourcesPanel({ resources }: Props) {
