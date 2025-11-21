@@ -1,59 +1,73 @@
 'use client'
-import type { PlayerBuilding, PlayerResource } from '@/types'
+
+import { PlayerBuilding, Resource } from '@/types'
+import { Button } from './button'
 import { hasSufficientResources } from '@/lib/game-logic'
 
-type Props = {
+interface UpgradeButtonProps {
   playerBuilding: PlayerBuilding
-  resources: PlayerResource[]
-  onUpgraded: () => void
+  resources: Resource[]
+  onUpgrade: (playerBuildingId: number) => void
 }
 
-export default function UpgradeButton({ playerBuilding, resources, onUpgraded }: Props) {
-  const handleUpgrade = async () => {
-    const res = await fetch('/api/game/upgrade', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerBuildingId: playerBuilding.id }),
-    })
-    const data = await res.json()
-    if (res.ok) {
-      alert(data.message)
-      onUpgraded()
-    } else {
-      alert(`Error: ${data.error}`)
-    }
+const UpgradeButton = ({
+  playerBuilding,
+  resources,
+  onUpgrade,
+}: UpgradeButtonProps) => {
+  const handleUpgradeClick = () => {
+    onUpgrade(playerBuilding.id)
   }
 
   const upgradeCost = {
     metal: Math.floor(playerBuilding.building_types.cost_metal * Math.pow(1.5, playerBuilding.level)),
     crystal: Math.floor(playerBuilding.building_types.cost_crystal * Math.pow(1.5, playerBuilding.level)),
-    energy: Math.floor(playerBuilding.building_types.cost_energy * Math.pow(1.5, playerBuilding.level)),
+    food: Math.floor(playerBuilding.building_types.cost_food * Math.pow(1.5, playerBuilding.level)),
   }
 
   const costs = [
-    { resource_type: 'Metal', cost: upgradeCost.metal },
-    { resource_type: 'Crystal', cost: upgradeCost.crystal },
-    { resource_type: 'Energy', cost: upgradeCost.energy },
+    { resource_type: 'metal', cost: upgradeCost.metal },
+    { resource_type: 'crystal', cost: upgradeCost.crystal },
+    { resource_type: 'food', cost: upgradeCost.food },
   ]
+
   const sufficientResources = hasSufficientResources(resources, costs)
 
   const getMissingResources = () => {
     return costs
-      .filter(cost => {
-        const resource = resources.find(r => r.resource_type === cost.resource_type)
+      .filter((cost) => {
+        const resource = resources.find(
+          (r) => r.resource_type === cost.resource_type,
+        )
         return !resource || resource.quantity < cost.cost
       })
-      .map(cost => `${cost.cost} ${cost.resource_type}`)
+      .map((cost) => `${cost.cost} ${cost.resource_type}`)
       .join(', ')
   }
 
   return (
-    <button
-      onClick={handleUpgrade}
+    <Button
+      onClick={handleUpgradeClick}
       disabled={!sufficientResources}
-      className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-1 px-3 rounded text-sm disabled:bg-slate-600 disabled:cursor-not-allowed"
+      className="w-full"
     >
-      {sufficientResources ? 'Upgrade' : `Needed: ${getMissingResources()}`}
-    </button>
+      <div>
+        <span>
+          Upgrade {playerBuilding.building_types.name} to Level{' '}
+          {playerBuilding.level + 1}
+        </span>
+        <div className="text-xs">
+          Cost: {upgradeCost.metal} Metal, {upgradeCost.crystal} Crystal,{' '}
+          {upgradeCost.food} Food
+        </div>
+        {!sufficientResources && (
+          <div className="text-xs text-red-500">
+            Missing: {getMissingResources()}
+          </div>
+        )}
+      </div>
+    </Button>
   )
 }
+
+export default UpgradeButton
