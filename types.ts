@@ -22,9 +22,8 @@ export interface BuildingType {
 
 export interface ResourceDefinition {
   id: number
-  player_id: string
-  resource_type: string
-  quantity: number
+  name: string
+  description: string | null
   created_at: string
 }
 
