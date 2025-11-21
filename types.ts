@@ -1,14 +1,16 @@
+// types.ts
+// This file defines ALL TypeScript interfaces used across the game
+// It must EXACTLY match what Supabase returns when you use joins (*, building_types(*), ship_types(*), etc.)
+
 export interface BuildingType {
   id: number
   name: string
+  tier: number
   cost_metal: number
   cost_crystal: number
   cost_food: number
-  tier: number
   power_usage: number
-  requirements: {
-    buildings: { name: string; level: number }[]
-  }
+  requirements: any // jsonb in DB – can be typed better later
   base_production: number
   production_bonus_per_level: number
   base_storage: number
@@ -20,6 +22,29 @@ export interface BuildingType {
   created_at: string
 }
 
+// This is what comes back from: SELECT *, building_types(*) FROM player_buildings
+export interface PlayerBuilding {
+  id: number
+  player_id: string
+  building_type_id: number
+  level: number
+  construction_ends_at: string | null // null = not building/upgrading
+  created_at: string
+
+  // This is the JOINED data from building_types table
+  building_types: BuildingType
+}
+
+// Player's current resources (metal, crystal, food)
+export interface Resource {
+  id: number
+  player_id: string
+  resource_type: 'metal' | 'crystal' | 'food'
+  quantity: number
+  created_at: string
+}
+
+// Admin table – defines which resources exist (metal, crystal, etc.)
 export interface ResourceDefinition {
   id: number
   name: string
@@ -27,53 +52,21 @@ export interface ResourceDefinition {
   created_at: string
 }
 
-
-export type PlayerAccount = {
-  id: string;
-  email: string;
-  role: string;
-}
-
-export interface PlayerBuilding {
-  id: number
-  player_id: string
-  building_type_id: number
-  level: number
-  construction_ends_at: string
-  created_at: string
-  building_types: BuildingType
-}
-
-export interface ShipType {
-  id: number
-  name: string
-  tier: number
-  role: string
-  unlock_requirement: {
-    buildings: { name: string; level: number }[]
-  }
-  metal_cost: number
-  food_cost: number
-  energy_cost: number
-  attack: number
-  defense: number
-  speed: number
-  hp: number
-  crew_food_per_hour: number
-  created_at: string
-}
-
+// This is what comes back from: SELECT *, ship_types(*) FROM player_ships
 export interface PlayerShip {
   id: number
   player_id: string
   ship_type_id: number
   quantity: number
   created_at: string
+
+  // This is the JOINED data from ship_types table – THIS WAS MISSING BEFORE
   ship_types: {
     id: number
     name: string
     tier: number
-    role: string
+    role: string | null
+    unlock_requirement: any
     metal_cost: number
     food_cost: number
     energy_cost: number
@@ -82,13 +75,15 @@ export interface PlayerShip {
     speed: number
     hp: number
     crew_food_per_hour: number
+    created_at: string
   }
 }
 
+// Optional: For future use (tech, artifacts, etc.)
 export interface TechType {
   id: number
   name: string
-  unlocks: string
+  unlocks: string | null
   required_lab_level: number
   created_at: string
 }
