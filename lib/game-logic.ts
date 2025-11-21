@@ -1,7 +1,7 @@
-import type { PlayerResource, BuildingType } from '@/types'
+import type { ResourceDefinition, BuildingType } from '@/types'
 
 export function hasSufficientResources(
-  resources: PlayerResource[],
+  resources: ResourceDefinition[],
   costs: { resource_type: string; cost: number }[]
 ): boolean {
   return costs.every(cost => {
