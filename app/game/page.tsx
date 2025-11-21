@@ -2,10 +2,12 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { PlayerResource, PlayerBuilding, BuildingType, ShipType, PlayerShip, TechType, PlayerTech } from '@/types'
-import BuildButton from '@/components/ui/BuildButton'
-import UpgradeButton from '@/components/ui/UpgradeButton'
-import CountdownTimer from '@/components/ui/CountdownTimer'
 import Message from '@/components/ui/Message'
+import ResourcesPanel from '@/components/game/ResourcesPanel'
+import FleetPanel from '@/components/game/FleetPanel'
+import TechPanel from '@/components/game/TechPanel'
+import BuildingsPanel from '@/components/game/BuildingsPanel'
+import ConstructionPanel from '@/components/game/ConstructionPanel'
 
 export default function Game() {
   const supabase = createClient()
@@ -111,17 +113,33 @@ export default function Game() {
   }, [])
 
   // ------------------------------------------
-  // START LIVE POLLING WHEN USER IS LOADED
+  // REAL-TIME DATA SUBSCRIPTION
   // ------------------------------------------
   useEffect(() => {
     if (!user) return
 
-    const interval = setInterval(() => {
-      fetchGameData(user.id)
-    }, 1000)
+    // Subscribe to player_buildings changes
+    const buildingsSubscription = supabase
+      .channel('player_buildings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'player_buildings' }, 
+        () => fetchGameData(user.id)
+      )
+      .subscribe()
 
-    return () => clearInterval(interval)
-  }, [user])
+    // Subscribe to resources changes
+    const resourcesSubscription = supabase
+      .channel('resources')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'resources' }, 
+        () => fetchGameData(user.id)
+      )
+      .subscribe()
+
+    // Cleanup subscriptions on component unmount
+    return () => {
+      supabase.removeChannel(buildingsSubscription)
+      supabase.removeChannel(resourcesSubscription)
+    }
+  }, [user, supabase])
 
   // ------------------------------------------
   // STORY LOGIC FIXED
@@ -209,135 +227,26 @@ export default function Game() {
 
         {/* LEFT COLUMN */}
         <div className="lg:col-span-1 space-y-4">
-
-          {/* RESOURCES */}
-          <div>
-            <h3 className="text-2xl font-semibold text-emerald-400">Resources</h3>
-            <ul className="bg-slate-800 p-4 rounded-lg">
-              {resources.map(r => (
-                <li key={r.id} className="text-lg">
-                  {r.resource_type}: {r.quantity}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* SHIPS */}
-          <div>
-            <h3 className="text-2xl font-semibold text-emerald-400">Your Fleet</h3>
-            <ul className="bg-slate-800 p-4 rounded-lg">
-              {ships.map(s => (
-                <li key={s.id}>{s.ship_types.name}: {s.quantity}</li>
-              ))}
-            </ul>
-          </div>
-
-          {/* TECH */}
-          <div>
-            <h3 className="text-2xl font-semibold text-emerald-400">Unlocked Tech</h3>
-            <ul className="bg-slate-800 p-4 rounded-lg">
-              {techs.map(t => (
-                <li key={t.id}>{t.tech_types.name}</li>
-              ))}
-            </ul>
-          </div>
+          <ResourcesPanel resources={resources} />
+          <FleetPanel ships={ships} />
+          <TechPanel techs={techs} />
         </div>
 
         {/* RIGHT COLUMN */}
         <div className="lg:col-span-2 space-y-4">
-
-          {/* BUILDINGS */}
-          <div>
-            <h3 className="text-2xl font-semibold text-emerald-400">Your Buildings</h3>
-            <ul className="space-y-2">
-              {buildings.map(b => (
-                <li
-                  key={b.id}
-                  className="bg-slate-800 p-3 rounded-lg flex justify-between items-center"
-                >
-                  <div>
-                    <p className="font-bold">
-                      {b.building_types.name} (Level {b.level})
-                    </p>
-
-                    {/* Construction countdown or stats */}
-                    {b.construction_ends_at &&
-                      new Date(b.construction_ends_at) > new Date()
-                      ? (
-                        <CountdownTimer endDate={new Date(b.construction_ends_at)} />
-                      ) : (
-                        <p className="text-sm text-slate-400">
-                          {b.building_types.base_production > 0 &&
-                            `Production: ${
-                              b.building_types.base_production *
-                              (1 +
-                                (b.level - 1) *
-                                  b.building_types.production_bonus_per_level)
-                            }/hr `}
-
-                          {b.building_types.base_storage > 0 &&
-                            `Storage: ${
-                              b.building_types.base_storage *
-                              (1 +
-                                (b.level - 1) *
-                                  b.building_types.storage_bonus_per_level)
-                            } `}
-
-                          {b.building_types.base_power_generation > 0 &&
-                            `Power: ${
-                              b.level * b.building_types.power_generation_per_level
-                            }`}
-                        </p>
-                      )}
-                  </div>
-
-                  {/* FIXED UPGRADE BUTTON CONDITION */}
-                  {(!b.construction_ends_at ||
-                    new Date(b.construction_ends_at) <= new Date()) && (
-                      <UpgradeButton
-                        playerBuildingId={b.id}
-                        onUpgraded={handleGameUpdate}
-                      />
-                    )}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* CONSTRUCT NEW BUILDINGS */}
-          <div>
-            <h3 className="text-2xl font-semibold text-emerald-400">Construct</h3>
-
-            <div className="flex flex-wrap gap-2">
-              {buildingTypes.map(bt => {
-                const isShelter = bt.name === 'Shelter'
-                const existingBuilding = buildings.find(b => b.building_types.id === bt.id)
-
-                const disabled = !!(existingBuilding || isBuilding || (!isShelter && !hasShelter))
-
-                const disabledText =
-                  existingBuilding
-                    ? 'Already Built'
-                    : isBuilding
-                      ? 'Construction in Progress'
-                      : 'Requires Shelter'
-
-                if (isShelter && hasShelter) return null
-
-                return (
-                  <BuildButton
-                    key={bt.id}
-                    buildingType={bt}
-                    disabled={disabled}
-                    disabledText={disabledText}
-                    onBuilt={handleGameUpdate}
-                  />
-                )
-              })}
-            </div>
-
-          </div>
-
+          <BuildingsPanel
+            buildings={buildings}
+            resources={resources}
+            onGameUpdate={handleGameUpdate}
+          />
+          <ConstructionPanel
+            buildingTypes={buildingTypes}
+            buildings={buildings}
+            resources={resources}
+            isBuilding={isBuilding}
+            hasShelter={hasShelter}
+            onGameUpdate={handleGameUpdate}
+          />
         </div>
 
       </div>
