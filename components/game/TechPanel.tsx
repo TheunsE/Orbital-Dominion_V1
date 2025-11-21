@@ -18,7 +18,7 @@ export default function TechPanel({ techs }: Props) {
       </li>
     ))
   )}
-</ul>>
+</ul>
     </div>
   )
 }
