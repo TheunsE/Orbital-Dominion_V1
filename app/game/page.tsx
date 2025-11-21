@@ -227,7 +227,7 @@ export default function Game() {
 
         {/* LEFT COLUMN */}
         <div className="lg:col-span-1 space-y-4">
-          <ResourcesPanel resources={resources} />
+          <ResourcesPanel resources={playerResources} />
           <FleetPanel ships={ships} />
           <TechPanel techs={techs} />
         </div>
@@ -236,13 +236,13 @@ export default function Game() {
         <div className="lg:col-span-2 space-y-4">
           <BuildingsPanel
             buildings={buildings}
-            resources={resources}
+            resources={playerResources}
             onGameUpdate={handleGameUpdate}
           />
           <ConstructionPanel
             buildingTypes={buildingTypes}
             buildings={buildings}
-            resources={resources}
+            resources={playerResources}
             isBuilding={isBuilding}
             hasShelter={hasShelter}
             onGameUpdate={handleGameUpdate}
