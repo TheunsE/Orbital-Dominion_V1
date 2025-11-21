@@ -27,8 +27,10 @@ CREATE TABLE IF NOT EXISTS public.guilds (
 CREATE TABLE IF NOT EXISTS public.building_types (
   id serial PRIMARY KEY,
   name text NOT NULL,
-  cost integer NOT NULL DEFAULT 100,
   tier integer NOT NULL DEFAULT 1,
+  cost_metal integer NOT NULL DEFAULT 0,
+  cost_crystal integer NOT NULL DEFAULT 0,
+  cost_food integer NOT NULL DEFAULT 0,
   power_usage integer NOT NULL DEFAULT 0,
   requirements jsonb,
   base_production integer NOT NULL DEFAULT 0,
@@ -184,7 +186,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_idx
 
 -- 5. Default data
 INSERT INTO public.resource_definitions (name) VALUES 
-  ('Oxygen'), ('Metal'), ('Crystal'), ('Food')
+  ('metal'), ('crystal'), ('food')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.planets (name) VALUES 
@@ -224,10 +226,9 @@ BEGIN
 
   -- Starting resources
   INSERT INTO public.resources (player_id, resource_type, quantity) VALUES
-    (new.id, 'Oxygen', 100),
-    (new.id, 'Metal', 100),
-    (new.id, 'Crystal', 100),
-    (new.id, 'Food', 100)
+    (new.id, 'metal', 500),
+    (new.id, 'crystal', 250),
+    (new.id, 'food', 100)
   ON CONFLICT (player_id, resource_type) DO UPDATE 
   SET quantity = EXCLUDED.quantity;
 
@@ -241,7 +242,27 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- 8. RPC function for atomic resource deduction
+CREATE OR REPLACE FUNCTION public.deduct_resources(
+  p_player_id uuid,
+  p_metal integer,
+  p_crystal integer,
+  p_food integer
+)
+RETURNS void AS $$
+BEGIN
+  UPDATE public.resources
+  SET quantity = quantity - p_metal
+  WHERE player_id = p_player_id AND resource_type = 'metal';
+
+  UPDATE public.resources
+  SET quantity = quantity - p_crystal
+  WHERE player_id = p_player_id AND resource_type = 'crystal';
+
+  UPDATE public.resources
+  SET quantity = quantity - p_food
+  WHERE player_id = p_player_id AND resource_type = 'food';
+END;
+$$ LANGUAGE plpgsql;
+
 -- DONE
-RAISE NOTICE 'COMPLETE GAME SCHEMA DEPLOYED!';
-RAISE NOTICE 'Username behavior: PlayerOne → PlayerOne | playerone → playerone1 | 龍王 → 龍王';
-RAISE NOTICE 'You are ready to build your game!';
