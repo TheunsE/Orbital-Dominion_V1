@@ -67,8 +67,6 @@ export default function GamePage() {
     setBuildingTypes(types || [])
     setShips(fleet || [])
     setIsLoading(false)
-
-    )
   }
 
   if (isLoading) {
