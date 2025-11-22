@@ -7,7 +7,7 @@ export default function ShipCostsPanel() {
   const supabase = createClient()
   const [ships, setShips] = useState<ShipType[]>([])
   const [msg, setMsg] = useState('')
-  const [costs, setCosts] = useState<{ [key: string]: { metal_cost: number, food_cost: number, energy_cost: number } }>({})
+  const [costs, setCosts] = useState<Record<string, { cost_metal: number; cost_crystal: number; cost_food: number }>>({})
 
   useEffect(() => {
     load()
@@ -21,7 +21,7 @@ export default function ShipCostsPanel() {
       setShips(data || [])
       const initialCosts: { [key: string]: { metal_cost: number, food_cost: number, energy_cost: number } } = {}
       data?.forEach(s => {
-        initialCosts[s.id] = {
+        initialCosts[String(b.id)] = {
           metal_cost: s.metal_cost,
           food_cost: s.food_cost,
           energy_cost: s.energy_cost
