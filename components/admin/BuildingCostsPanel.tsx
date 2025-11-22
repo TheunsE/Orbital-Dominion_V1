@@ -7,7 +7,7 @@ export default function BuildingCostsPanel() {
   const supabase = createClient()
   const [buildings, setBuildings] = useState<BuildingType[]>([])
   const [msg, setMsg] = useState('')
-  const [costs, setCosts] = useState<{ [key: string]: { cost_metal: number, cost_crystal: number, cost_food: number } }>({})
+  const [costs, setCosts] = useState<Record<string, { cost_metal: number; cost_crystal: number; cost_food: number }>>({})
 
   useEffect(() => {
     load()
@@ -21,7 +21,7 @@ export default function BuildingCostsPanel() {
       setBuildings(data || [])
       const initialCosts: { [key: string]: { cost_metal: number, cost_crystal: number, cost_food: number } } = {}
       data?.forEach(b => {
-        initialCosts[b.id] = {
+        initialCosts[String(b.id)] = {
           cost_metal: b.cost_metal,
           cost_crystal: b.cost_crystal,
           cost_food: b.cost_food
