@@ -41,9 +41,9 @@ const UpgradeButton = ({
   }
 
   const costs = [
-    { resource_type: 'metal', cost: upgradeCost.metal },
-    { resource_type: 'crystal', cost: upgradeCost.crystal },
-    { resource_type: 'food', cost: upgradeCost.food },
+    { resource_type: 'metal' as const, cost: upgradeCost.metal },
+    { resource_type: 'crystal' as const, cost: upgradeCost.crystal },
+    { resource_type: 'food' as const, cost: upgradeCost.food },
   ]
 
   const sufficientResources = hasSufficientResources(resources, costs)
