@@ -118,7 +118,11 @@ export default function GamePage() {
           <main className="lg:col-span-5">
             <div className="bg-slate-800/70 backdrop-blur-lg rounded-2xl border border-cyan-500/40 p-8">
               <h2 className="text-3xl font-bold text-emerald-400 mb-8 text-center">Your Buildings</h2>
-              <BuildingsPanel buildings={buildings} resources={resources} />
+              <BuildingsPanel
+                buildings={buildings}
+                resources={resources}
+                onGameUpdate={loadData}   {/* This was missing */}
+              />
             </div>
           </main>
 
@@ -131,6 +135,7 @@ export default function GamePage() {
                 buildings={buildings}
                 resources={resources}
                 hasShelter={hasShelter}
+                onGameUpdate={loadData}   {/* This was missing */}
               />
             </div>
           </aside>
