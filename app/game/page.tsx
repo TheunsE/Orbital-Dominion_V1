@@ -19,6 +19,7 @@ export default function GamePage() {
   const [ships, setShips] = useState<PlayerShip[]>([])
   const [alerts, setAlerts] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isBuilding, setIsBuilding] = useState(false)  // ← THIS WAS MISSING!
 
   const hasShelter = buildings.some(
     b => b.building_types.name === 'Shelter' && b.level > 0
@@ -67,7 +68,7 @@ export default function GamePage() {
     setBuildingTypes(types || [])
     setShips(fleet || [])
     setIsLoading(false)
-  } // ← THIS WAS MISSING! Fixed now
+  }
 
   if (isLoading) {
     return (
@@ -132,6 +133,8 @@ export default function GamePage() {
                 buildings={buildings}
                 resources={resources}
                 hasShelter={hasShelter}
+                isBuilding={isBuilding}        // ← NOW ADDED!
+                setIsBuilding={setIsBuilding}  // ← AND THIS TOO!
                 onGameUpdate={loadData}
               />
             </div>
