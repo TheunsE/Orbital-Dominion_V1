@@ -8,7 +8,7 @@ import TechPanel from '@/components/game/TechPanel'
 import BuildingsPanel from '@/components/game/BuildingsPanel'
 import ConstructionPanel from '@/components/game/ConstructionPanel'
 import { hasSufficientResources } from '@/lib/game-logic'
-import type { Resource, PlayerBuilding, BuildingType, Ship } from '@/types'
+import type { Resource, PlayerBuilding, BuildingType, PlayerShip } from '@/types'
 
 const supabase = createClient()
 
@@ -16,7 +16,7 @@ export default function GamePage() {
   const [playerResources, setPlayerResources] = useState<Resource[]>([])
   const [buildings, setBuildings] = useState<PlayerBuilding[]>([])
   const [buildingTypes, setBuildingTypes] = useState<BuildingType[]>([])
-  const [ships, setShips] = useState<Ship[]>([])
+  const [ships, setShips] = useState<PlayerShip[]>([])
   const [isBuilding, setIsBuilding] = useState(false)
   const [message, setMessage] = useState('')
   const [userEmail, setUserEmail] = useState<string>('Commander')
