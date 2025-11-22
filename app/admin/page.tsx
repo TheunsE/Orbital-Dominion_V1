@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import BuildingCostsPanel from '@/components/admin/BuildingCostsPanel'
+import ShipCostsPanel from '@/components/admin/ShipCostsPanel'
 
 type Event = { id?: string; title: string; description?: string }
 
@@ -72,6 +74,9 @@ export default function Admin(){
           ))}
         </ul>
       </div>
+      
+      <BuildingCostsPanel />
+      <ShipCostsPanel />
     </div>
   )
 }
