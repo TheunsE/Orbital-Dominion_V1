@@ -107,19 +107,22 @@ export default function GamePage() {
       <div className="max-w-7xl mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
+          {/* LEFT SIDEBAR */}
           <aside className="lg:col-span-3 space-y-6">
             <ResourcesPanel resources={resources} buildings={buildings} />
             <FleetPanel ships={ships} />
             <TechPanel techs={[]} />
           </aside>
 
+          {/* CENTER: Your Buildings */}
           <main className="lg:col-span-5">
             <div className="bg-slate-800/70 backdrop-blur-lg rounded-2xl border border-cyan-500/40 p-8">
               <h2 className="text-3xl font-bold text-emerald-400 mb-8 text-center">Your Buildings</h2>
-              <BuildingsPanel buildings={buildings} resources={resources} onUpgradeSuccess={loadData} />
+              <BuildingsPanel buildings={buildings} resources={resources} />
             </div>
           </main>
 
+          {/* RIGHT: Construction */}
           <aside className="lg:col-span-4">
             <div className="bg-slate-800/70 backdrop-blur-lg rounded-2xl border border-purple-500/40 p-8">
               <h2 className="text-3xl font-bold text-purple-400 mb-8 text-center">Construct New</h2>
@@ -128,7 +131,6 @@ export default function GamePage() {
                 buildings={buildings}
                 resources={resources}
                 hasShelter={hasShelter}
-                onBuildSuccess={loadData}
               />
             </div>
           </aside>
