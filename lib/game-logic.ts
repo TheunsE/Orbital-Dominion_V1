@@ -1,13 +1,17 @@
 import type { Resource } from '@/types'
 
+interface Cost {
+  resource_type: 'metal' | 'crystal' | 'food'
+  cost: number
+}
 export function hasSufficientResources(
   resources: Resource[],
-  costs: { resource_type: string; cost: number }[]
+  costs: Cost[]
 ): boolean {
   return costs.every((cost) => {
-    const resource = resources.find(
+    const playerResource = resources.find(
       (r) => r.resource_type === cost.resource_type
     )
-    return resource && resource.quantity >= cost.cost
+    return playerResource && playerResource.quantity >= cost.cost : false
   })
 }
