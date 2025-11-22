@@ -7,38 +7,38 @@ import FleetPanel from '@/components/game/FleetPanel'
 import TechPanel from '@/components/game/TechPanel'
 import BuildingsPanel from '@/components/game/BuildingsPanel'
 import ConstructionPanel from '@/components/game/ConstructionPanel'
-import { hasSufficientResources } from '@/lib/game-logic'
 import type { Resource, PlayerBuilding, BuildingType, PlayerShip } from '@/types'
 
 const supabase = createClient()
 
 export default function GamePage() {
-  const [playerResources, setPlayerResources] = useState<Resource[]>([])
+  const [userName, setUserName] = useState('Commander')
+  const [resources, setResources] = useState<Resource[]>([])
   const [buildings, setBuildings] = useState<PlayerBuilding[]>([])
   const [buildingTypes, setBuildingTypes] = useState<BuildingType[]>([])
   const [ships, setShips] = useState<PlayerShip[]>([])
-  const [isBuilding, setIsBuilding] = useState(false)
-  const [message, setMessage] = useState('')
-  const [userEmail, setUserEmail] = useState<string>('Commander')
+  const [alerts, setAlerts] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const hasShelter = buildings.some(b => b.building_types.name === 'Shelter' && b.level > 0)
+  const hasShelter = buildings.some(
+    b => b.building_types.name === 'Shelter' && b.level > 0
+  )
 
-  // Load user email once
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) {
-        setUserEmail(data.user.email.split('@')[0]) // show username only
+        setUserName(data.user.email.split('@')[0])
       }
     })
   }, [])
 
   useEffect(() => {
-    loadGameData()
-    const interval = setInterval(loadGameData, 10000)
+    loadData()
+    const interval = setInterval(loadData, 15000)
     return () => clearInterval(interval)
   }, [])
 
-  async function loadGameData() {
+  async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -53,7 +53,7 @@ export default function GamePage() {
     const [
       { data: res },
       { data: blds },
-      { data: bTypes },
+      { data: types },
       { data: fleet }
     ] = await Promise.all([
       supabase.from('resources').select('*').eq('player_id', player.id),
@@ -62,108 +62,78 @@ export default function GamePage() {
       supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', player.id)
     ])
 
-    setPlayerResources(res || [])
+    setResources(res || [])
     setBuildings(blds || [])
-    setBuildingTypes(bTypes || [])
+    setBuildingTypes(types || [])
     setShips(fleet || [])
+    setIsLoading(false)
+
+    )
   }
 
-  async function handleBuild(buildingType: BuildingType) {
-    const costs = [
-      { resource_type: 'metal' as const, cost: buildingType.cost_metal },
-      { resource_type: 'crystal' as const, cost: buildingType.cost_crystal },
-      { resource_type: 'food' as const, cost: buildingType.cost_food },
-    ]
-
-    if (!hasSufficientResources(playerResources, costs)) {
-      setMessage('Not enough resources!')
-      setTimeout(() => setMessage(''), 3000)
-      return
-    }
-
-    setIsBuilding(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: player } = await supabase.from('players').select('id').eq('user_id', user?.id).single()
-
-    const { error } = await supabase.rpc('build_building', {
-      p_player_id: player?.id,
-      p_building_type_id: buildingType.id
-    })
-
-    if (error) {
-      setMessage(error.message)
-    } else {
-      setMessage(`Started building ${buildingType.name}!`)
-      loadGameData()
-    }
-    setIsBuilding(false)
-    setTimeout(() => setMessage(''), 4000)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-4xl font-bold text-cyan-400 animate-pulse">Entering orbit...</div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
-      {/* Header */}
-      <div className="bg-slate-900/80 backdrop-blur border-b border-cyan-500/30">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
-            Game Dashboard
+      <header className="bg-slate-900/90 backdrop-blur border-b border-cyan-600/30">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
+            Orbital Dominion
           </h1>
-          <div className="text-lg opacity-90">
-            Welcome, <span className="text-emerald-300 font-medium">{userEmail}</span>
+          <div className="text-xl">
+            Welcome, <span className="text-emerald-300 font-semibold">{userName}</span>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Alert */}
+      {alerts.length > 0 && (
+        <div className="bg-red-900/90 border-y-4 border-red-500 text-center py-4">
+          {alerts.map((a, i) => (
+            <div key={i} className="text-xl font-bold text-red-100">{a}</div>
+          ))}
+        </div>
+      )}
+
       {!hasShelter && (
-        <div className="bg-orange-900/60 border border-orange-500 text-orange-200 px-6 py-4 text-center font-medium text-lg">
+        <div className="bg-orange-900/70 text-orange-100 text-center py-4 text-lg font-medium">
           Your first priority is to protect your crew. Construct a Shelter to begin.
         </div>
       )}
 
-      {message && (
-        <div className="bg-emerald-900/80 border border-emerald-500 text-emerald-200 px-6 py-3 text-center font-medium">
-          {message}
-        </div>
-      )}
-
-      {/* Main 3-column layout */}
       <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {/* LEFT COLUMN */}
-          <div className="lg:col-span-3 space-y-6">
-            <ResourcesPanel resources={playerResources} />
+          <aside className="lg:col-span-3 space-y-6">
+            <ResourcesPanel resources={resources} buildings={buildings} />
             <FleetPanel ships={ships} />
             <TechPanel techs={[]} />
-          </div>
+          </aside>
 
-          {/* CENTER COLUMN - Your Buildings */}
-          <div className="lg:col-span-5">
-            <div className="bg-slate-800/80 backdrop-blur rounded-xl border border-cyan-500/30 p-6">
-              <h2 className="text-2xl font-bold text-emerald-400 mb-6">Your Buildings</h2>
-              <BuildingsPanel
-                buildings={buildings}
-                resources={playerResources}
-                onGameUpdate={loadGameData}
-              />
+          <main className="lg:col-span-5">
+            <div className="bg-slate-800/70 backdrop-blur-lg rounded-2xl border border-cyan-500/40 p-8">
+              <h2 className="text-3xl font-bold text-emerald-400 mb-8 text-center">Your Buildings</h2>
+              <BuildingsPanel buildings={buildings} resources={resources} onUpgradeSuccess={loadData} />
             </div>
-          </div>
+          </main>
 
-          {/* RIGHT COLUMN - Construction */}
-          <div className="lg:col-span-4">
-            <div className="bg-slate-800/80 backdrop-blur rounded-xl border border-purple-500/30 p-6">
-              <h2 className="text-2xl font-bold text-purple-400 mb-6">Construct</h2>
+          <aside className="lg:col-span-4">
+            <div className="bg-slate-800/70 backdrop-blur-lg rounded-2xl border border-purple-500/40 p-8">
+              <h2 className="text-3xl font-bold text-purple-400 mb-8 text-center">Construct New</h2>
               <ConstructionPanel
                 buildingTypes={buildingTypes}
                 buildings={buildings}
-                resources={playerResources}
-                isBuilding={isBuilding}
+                resources={resources}
                 hasShelter={hasShelter}
-                onGameUpdate={loadGameData}
+                onBuildSuccess={loadData}
               />
             </div>
-          </div>
+          </aside>
 
         </div>
       </div>
