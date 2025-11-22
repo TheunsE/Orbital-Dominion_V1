@@ -12,6 +12,6 @@ export function hasSufficientResources(
     const playerResource = resources.find(
       (r) => r.resource_type === cost.resource_type
     )
-    return playerResource && playerResource.quantity >= cost.cost : false
+    return playerResource ? playerResource.quantity >= cost.cost : false
   })
 }
