@@ -56,7 +56,7 @@ export default function GamePage() {
         .from('players')
         .select('id')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
       if (playerError || !player) {
         console.error('Player not found:', playerError?.message)
