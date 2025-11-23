@@ -23,6 +23,9 @@ export default function GamePage() {
 
   const hasShelter = buildings.some(b => b.building_types.name === 'Shelter' && b.level > 0)
 
+  // ─────────────────────────────────────────────────────────────
+  // Get display name from email
+  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) {
@@ -31,6 +34,9 @@ export default function GamePage() {
     })
   }, [])
 
+  // ─────────────────────────────────────────────────────────────
+  // Auto-refresh data every 15 seconds
+  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     loadData()
     const interval = setInterval(loadData, 15000)
@@ -38,34 +44,36 @@ export default function GamePage() {
   }, [])
 
   // ─────────────────────────────────────────────────────────────
-  // FINAL BULLETPROOF LOADER + AUTO PLAYER CREATION
+  // FINAL BULLETPROOF DATA LOADER + AUTO PLAYER & STARTER SETUP
   // ─────────────────────────────────────────────────────────────
   async function loadData() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        console.warn('No user logged in')
+        console.warn('No authenticated user')
         return
       }
 
-      // Try to get existing player
+      // 1. Check if player already exists
       let { data: player } = await supabase
         .from('players')
         .select('id')
         .eq('user_id', user.id)
         .maybeSingle()
 
-      // If no player → create one + starter stuff
+      // 2. If not → create player + give starter resources & Shelter
       if (!player) {
-        console.log('Creating new player...')
+        console.log('No player found → creating new empire for', user.email)
 
-        const { data: newPlayer } = await supabase
+        const { data: newPlayer, error: createError } = await supabase
           .from('players')
           .insert({ user_id: user.id })
           .select('id')
           .single()
 
-        if (!newPlayer) throw new Error('Failed to create player')
+        if (createError || !newPlayer) {
+          throw new Error('Failed to create player: ' + createError?.message)
+        }
 
         player = newPlayer
 
@@ -92,12 +100,12 @@ export default function GamePage() {
         }
       }
 
-      // Now load all game data
+      // 3. NOW load all player data — guaranteed to exist
       const [
         { data: res },
         { data: blds },
         { data: types },
-        { data: fleet }
+        { data: fleet },
       ] = await Promise.all([
         supabase.from('resources').select('*').eq('player_id', player.id),
         supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', player.id),
@@ -111,16 +119,17 @@ export default function GamePage() {
       setShips(fleet || [])
 
     } catch (err: any) {
-      console.error('Error in loadData:', err)
+      console.error('Critical error in loadData:', err)
     } finally {
-      setIsLoading(false)   // ← ALWAYS runs
+      setIsLoading(false)   // ← This runs EVERY time — no more stuck screens
     }
   }
 
   // ─────────────────────────────────────────────────────────────
-  // RENDER
+  // RENDER LOGIC
   // ─────────────────────────────────────────────────────────────
 
+  // 1. Initial loading
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -131,22 +140,24 @@ export default function GamePage() {
     )
   }
 
-  if (!resources.length && !buildings.length) {
+  // 2. Safety fallback (should almost never show now)
+  if (!resources.length || !buildings.length) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center text-white">
-        <div className="text-center max-w-2xl px-8">
-          <h1 className="text-5xl font-bold text-emerald-400 mb-6">
-            Welcome to Orbital Dominion, {userName}!
-          </h1>
-          <p className="text-xl">Your empire has been established.</p>
-          <p className="text-lg opacity-80 mt-4">Refresh to begin your conquest.</p>
+        <div className="text-center">
+          <div className="text-6xl font-bold text-cyan-400 animate-pulse mb-8">
+            Initializing your empire...
+          </div>
+          <p className="text-xl">Please wait a moment and refresh if needed.</p>
         </div>
       </div>
     )
   }
 
+  // 3. MAIN GAME DASHBOARD — you will always reach here
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+      {/* Header */}
       <header className="bg-slate-900/90 backdrop-blur border-b border-cyan-600/30">
         <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
@@ -158,6 +169,7 @@ export default function GamePage() {
         </div>
       </header>
 
+      {/* Future alerts */}
       {alerts.length > 0 && (
         <div className="bg-red-900/90 border-y-4 border-red-500 text-center py-4">
           {alerts.map((a, i) => (
@@ -166,27 +178,37 @@ export default function GamePage() {
         </div>
       )}
 
+      {/* Shelter warning */}
       {!hasShelter && (
         <div className="bg-orange-900/70 text-orange-100 text-center py-4 text-lg font-medium">
           Your first priority is to protect your crew. Construct a Shelter to begin.
         </div>
       )}
 
+      {/* Main Layout */}
       <div className="max-w-7xl mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+          {/* Left Sidebar */}
           <aside className="lg:col-span-3 space-y-6">
             <ResourcesPanel resources={resources} buildings={buildings} />
             <FleetPanel ships={ships} />
             <TechPanel techs={[]} />
           </aside>
 
+          {/* Center: Your Buildings */}
           <main className="lg:col-span-5">
             <div className="bg-slate-800/70 backdrop-blur-lg rounded-2xl border border-cyan-500/40 p-8">
               <h2 className="text-3xl font-bold text-emerald-400 mb-8 text-center">Your Buildings</h2>
-              <BuildingsPanel buildings={buildings} resources={resources} onGameUpdate={loadData} />
+              <BuildingsPanel
+                buildings={buildings}
+                resources={resources}
+                onGameUpdate={loadData}
+              />
             </div>
           </main>
 
+          {/* Right: Construction */}
           <aside className="lg:col-span-4">
             <div className="bg-slate-800/70 backdrop-blur-lg rounded-2xl border border-purple-500/40 p-8">
               <h2 className="text-3xl font-bold text-purple-400 mb-8 text-center">Construct New</h2>
@@ -200,6 +222,7 @@ export default function GamePage() {
               />
             </div>
           </aside>
+
         </div>
       </div>
     </div>
