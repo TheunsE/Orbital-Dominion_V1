@@ -1,3 +1,4 @@
+// app/game/building/[name]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
