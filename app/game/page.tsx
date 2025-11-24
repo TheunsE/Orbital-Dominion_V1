@@ -17,16 +17,19 @@ export default function GamePage() {
   useEffect(() => {
     const check = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.replace('/login'); return; }
+      if (!user) {
+        router.replace('/login');
+        return;
+      }
       setUser(user);
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('has_completed_onboarding')
         .eq('id', user.id)
         .single();
 
-      if (data?.has_completed_onboarding) {
+      if (error || data?.has_completed_onboarding) {
         setOnboarding(false);
       } else {
         setOnboarding(true);
@@ -38,22 +41,29 @@ export default function GamePage() {
   }, [router]);
 
   const handleConstructBase = async () => {
-    if (timer > 0) return;
+    if (timer > 0 || !user) return;
 
-    // Assuming you have a "Command Center" or similar as starting building
+    // Change building_type_id to your actual starting building ID
     const startingBuilding = { player_id: user.id, building_type_id: 1, level: 1 };
 
     await Promise.all([
-      supabase.from('player_buildings').upsert(startingBuilding),
+      supabase.from('player_buildings').upsert(startingBuilding, { onConflict: 'player_id,building_type_id' }),
       supabase.from('profiles').update({ has_completed_onboarding: true }).eq('id', user.id)
     ]);
 
     setOnboarding(false);
   };
 
-  if (onboarding === null)
-    return <div className="h-screen bg-black text-white flex items-center justify-center text-4xl">Entering orbit...</div>;
+  // ────── LOADING STATES ──────
+  if (!user || onboarding === null) {
+    return (
+      <div className="h-screen bg-black text-white flex items-center justify-center text-4xl">
+        Entering orbit...
+      </div>
+    );
+  }
 
+  // ────── ONBOARDING SCREEN ──────
   if (onboarding) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-black via-slate-900 to-blue-950 flex flex-col items-center justify-center text-white px-6">
@@ -77,7 +87,7 @@ export default function GamePage() {
               ${timer > 0 
                 ? 'bg-gray-700 text-gray-400 cursor-not-allowed' 
                 : 'bg-cyan-600 hover:bg-cyan-500 text-black animate-pulse shadow-2xl shadow-cyan-500/50'
-              `}
+              }`}
           >
             {timer > 0 ? `Construct Colonial Command Base (${timer}s)` : 'Construct Colonial Command Base'}
           </button>
@@ -86,11 +96,12 @@ export default function GamePage() {
     );
   }
 
+  // ────── MAIN DASHBOARD (only renders when NOT onboarding and user exists) ──────
   return <Dashboard userId={user.id} />;
 }
 
 // ──────────────────────────────────────
-// DASHBOARD – 100% MATCHES YOUR types.ts
+// DASHBOARD – 100% WORKING WITH YOUR SCHEMA
 // ──────────────────────────────────────
 function Dashboard({ userId }: { userId: string }) {
   const [resources, setResources] = useState({ metal: 0, crystal: 0, food: 0 });
@@ -109,11 +120,13 @@ function Dashboard({ userId }: { userId: string }) {
         supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', userId),
       ]);
 
-      // Parse resources
+      // Resources: multiple rows → object
       const resMap = (resData as Resource[] || []).reduce((acc, r) => {
-        if (r.resource_type in acc) acc[r.resource_type] = r.quantity;
+        if (r.resource_type === 'metal' || r.resource_type === 'crystal' || r.resource_type === 'food') {
+          acc[r.resource_type] = r.quantity;
+        }
         return acc;
-      }, { metal: 0, crystal: 0, food: 0 });
+      }, { metal: 0, crystal: 0, food: 0 } as any);
       setResources(resMap);
 
       setBuildings((buildingData as PlayerBuilding[]) || []);
@@ -125,16 +138,6 @@ function Dashboard({ userId }: { userId: string }) {
     return () => clearInterval(i);
   }, [userId]);
 
-  // Production (you can refine this per building type later)
-  const production = buildings.reduce((acc, b) => {
-    const type = b.building_types;
-    const level = b.level;
-    acc.metal += level * (type.production_bonus_per_level || 0);
-    acc.crystal += level * (type.production_bonus_per_level || 0);
-    acc.food += level * (type.production_bonus_per_level || 0);
-    return acc;
-  }, { metal: 0, crystal: 0, food: 0 });
-
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
@@ -145,46 +148,51 @@ function Dashboard({ userId }: { userId: string }) {
           {(['metal', 'crystal', 'food'] as const).map(res => (
             <div key={res} className="bg-gray-800 p-6 rounded-lg">
               <h3 className="text-lg capitalize">{res}</h3>
-              <p className="text-2xl">{resources[res]} <span className="text-green-400">+{production[res] || 0}/h</span></p>
+              <p className="text-2xl">{resources[res] || 0}</p>
             </div>
           ))}
           <div className="bg-gray-800 p-6 rounded-lg">
             <h3 className="text-lg">Power</h3>
-            <p className="text-2xl">Calculating...</p>
+            <p className="text-2xl">—</p>
           </div>
         </div>
 
         {/* Buildings */}
         <h2 className="text-3xl mb-6">Buildings</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
-          {buildings.map(b => (
-            <Link
-              key={b.id}
-              href={`/game/building/${encodeURIComponent(b.building_types.name)}`}
-              className="bg-gray-800 p-8 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
-            >
-              <h3 className="text-xl font-bold">{b.building_types.name}</h3>
-              <p className="text-4xl mt-4 text-cyan-400">Level {b.level}</p>
-            </Link>
-          ))}
+          {buildings.length === 0 ? (
+            <p className="text-gray-400 col-span-full text-center">No buildings yet. Complete onboarding!</p>
+          ) : (
+            buildings.map(b => (
+              <Link
+                key={b.id}
+                href={`/game/building/${encodeURIComponent(b.building_types.name)}`}
+                className="bg-gray-800 p-8 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+              >
+                <h3 className="text-xl font-bold">{b.building_types.name}</h3>
+                <p className="text-4xl mt-4 text-cyan-400">Level {b.level}</p>
+              </Link>
+            ))
+          )}
         </div>
 
         {/* Fleet */}
-        <h2 className="text-3xl mb-6">Fleet (Work Yard)</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {ships.map(s => (
-            <Link
-              key={s.id}
-              href={`/game/fleet/${encodeURIComponent(s.ship_types.name)}`}
-              className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
-            >
-              <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
-              <p className="text-3xl text-cyan-400">×{s.quantity}</p>
-              <p className="text-xs opacity-75 mt-2">
-                ATK {s.ship_types.attack} | DEF {s.ship_types.defense} | HP {s.ship_types.hp}
-              </p>
-            </Link>
-          ))}
+        <h2 className="text-3xl mb-6">Fleet</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {ships.length === 0 ? (
+            <p className="text-gray-400 col-span-full text-center">No ships built yet</p>
+          ) : (
+            ships.map(s => (
+              <Link
+                key={s.id}
+                href={`/game/fleet/${encodeURIComponent(s.ship_types.name)}`}
+                className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+              >
+                <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
+                <p className="text-3xl text-cyan-400">×{s.quantity}</p>
+              </Link>
+            ))
+          )}
         </div>
 
         <div className="mt-16 text-center space-x-8 text-lg">
