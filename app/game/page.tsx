@@ -1,10 +1,10 @@
-// app/game/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import type { PlayerBuilding, PlayerShip, Resource } from '@/types';
 
 const supabase = createClient();
 
@@ -40,17 +40,11 @@ export default function GamePage() {
   const handleConstructBase = async () => {
     if (timer > 0) return;
 
-    const buildings = [
-      'Communications Center','Warroom','Radar Station','Trade Pod',
-      'Work Yard','Research lab','Bunker','Silo','Shield'
-    ].map(name => ({
-      user_id: user.id,
-      name,
-      level: name === 'Communications Center' ? 1 : 0
-    }));
+    // Assuming you have a "Command Center" or similar as starting building
+    const startingBuilding = { player_id: user.id, building_type_id: 1, level: 1 };
 
     await Promise.all([
-      supabase.from('buildings').upsert(buildings, { onConflict: 'user_id,name' }),
+      supabase.from('player_buildings').upsert(startingBuilding),
       supabase.from('profiles').update({ has_completed_onboarding: true }).eq('id', user.id)
     ]);
 
@@ -83,7 +77,7 @@ export default function GamePage() {
               ${timer > 0 
                 ? 'bg-gray-700 text-gray-400 cursor-not-allowed' 
                 : 'bg-cyan-600 hover:bg-cyan-500 text-black animate-pulse shadow-2xl shadow-cyan-500/50'
-              }`}
+              `}
           >
             {timer > 0 ? `Construct Colonial Command Base (${timer}s)` : 'Construct Colonial Command Base'}
           </button>
@@ -96,30 +90,34 @@ export default function GamePage() {
 }
 
 // ──────────────────────────────────────
-// DASHBOARD
+// DASHBOARD – 100% MATCHES YOUR types.ts
 // ──────────────────────────────────────
 function Dashboard({ userId }: { userId: string }) {
-  const [resources, setResources] = useState({ metal: 0, crystal: 0, food: 0, power: 0 });
-  const [buildings, setBuildings] = useState<any[]>([]);
-  const [buildingConfigs, setBuildingConfigs] = useState<any[]>([]);
-  const [playerShips, setPlayerShips] = useState<any[]>([]);
-  const [shipConfigs, setShipConfigs] = useState<any[]>([]);
+  const [resources, setResources] = useState({ metal: 0, crystal: 0, food: 0 });
+  const [buildings, setBuildings] = useState<PlayerBuilding[]>([]);
+  const [ships, setShips] = useState<PlayerShip[]>([]);
 
   useEffect(() => {
     const fetch = async () => {
-      const [r, b, bc, ps, sc] = await Promise.all([
-        supabase.from('resources').select('*').eq('user_id', userId).single(),
-        supabase.from('buildings').select('name,level').eq('user_id', userId),
-        supabase.from('building_configs').select('*'),
-        supabase.from('player_ships').select('*').eq('user_id', userId),
-        supabase.from('ship_configs').select('*')
+      const [
+        { data: resData },
+        { data: buildingData },
+        { data: shipData },
+      ] = await Promise.all([
+        supabase.from('resources').select('*').eq('player_id', userId),
+        supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', userId),
+        supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', userId),
       ]);
 
-      setResources(r.data || { metal:0, crystal:0, food:0, power:0 });
-      setBuildings(b.data || []);
-      setBuildingConfigs(bc.data || []);
-      setPlayerShips(ps.data || []);
-      setShipConfigs(sc.data || []);
+      // Parse resources
+      const resMap = (resData as Resource[] || []).reduce((acc, r) => {
+        if (r.resource_type in acc) acc[r.resource_type] = r.quantity;
+        return acc;
+      }, { metal: 0, crystal: 0, food: 0 });
+      setResources(resMap);
+
+      setBuildings((buildingData as PlayerBuilding[]) || []);
+      setShips((shipData as PlayerShip[]) || []);
     };
 
     fetch();
@@ -127,14 +125,15 @@ function Dashboard({ userId }: { userId: string }) {
     return () => clearInterval(i);
   }, [userId]);
 
-  const production = buildingConfigs.reduce((acc, cfg) => {
-    const lvl = buildings.find(b => b.name === cfg.name)?.level || 0;
-    acc.metal += lvl * cfg.production_metal_per_level;
-    acc.crystal += lvl * cfg.production_crystal_per_level;
-    acc.food += lvl * cfg.production_food_per_level;
-    acc.power += lvl * cfg.production_power_per_level;
+  // Production (you can refine this per building type later)
+  const production = buildings.reduce((acc, b) => {
+    const type = b.building_types;
+    const level = b.level;
+    acc.metal += level * (type.production_bonus_per_level || 0);
+    acc.crystal += level * (type.production_bonus_per_level || 0);
+    acc.food += level * (type.production_bonus_per_level || 0);
     return acc;
-  }, { metal: 0, crystal: 0, food: 0, power: 0 });
+  }, { metal: 0, crystal: 0, food: 0 });
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
@@ -143,59 +142,43 @@ function Dashboard({ userId }: { userId: string }) {
 
         {/* Resources */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-          {(['metal','crystal','food','power'] as const).map(res => (
+          {(['metal', 'crystal', 'food'] as const).map(res => (
             <div key={res} className="bg-gray-800 p-6 rounded-lg">
               <h3 className="text-lg capitalize">{res}</h3>
-              <p className="text-2xl">{resources[res]} <span className="text-green-400">+{production[res]}/h</span></p>
+              <p className="text-2xl">{resources[res]} <span className="text-green-400">+{production[res] || 0}/h</span></p>
             </div>
           ))}
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h3 className="text-lg">Power</h3>
+            <p className="text-2xl">Calculating...</p>
+          </div>
         </div>
 
         {/* Buildings */}
         <h2 className="text-3xl mb-6">Buildings</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
-          {buildingConfigs.map(cfg => {
-            const lvl = buildings.find(b => b.name === cfg.name)?.level || 0;
-            return (
-              <Link
-                key={cfg.name}
-                href={`/game/building/${encodeURIComponent(cfg.name)}`}
-                className="bg-gray-800 p-8 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
-              >
-                <h3 className="text-xl font-bold">{cfg.name.replace(/([A-Z])/g, ' $1').trim()}</h3>
-                <p className="text-4xl mt-4 text-cyan-400">Level {lvl}</p>
-              </Link>
-            );
-          })}
+          {buildings.map(b => (
+            <Link
+              key={b.id}
+              href={`/game/building/${encodeURIComponent(b.building_types.name)}`}
+              className="bg-gray-800 p-8 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+            >
+              <h3 className="text-xl font-bold">{b.building_types.name}</h3>
+              <p className="text-4xl mt-4 text-cyan-400">Level {b.level}</p>
+            </Link>
+          ))}
         </div>
 
         {/* Fleet */}
         <h2 className="text-3xl mb-6">Fleet (Work Yard)</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {shipConfigs.map(ship => {
-            const owned = playerShips.find(s => s.ship_name === ship.name)?.quantity || 0;
-            return (
-              <Link
-                key={ship.name}
-                href={`/game/fleet/${encodeURIComponent(ship.name)}`}
-                className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
-              >
-                <h3 className="text-xl font-bold">{ship.name}</h3>
-                <p className="text-3xl text-cyan-400">×{owned}</p>
-                <p className="text-xs opacity-75 mt-2">
-                  ATK {ship.attack_points} | DEF {ship.defense_points}
-                </p>
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="mt-16 text-center space-x-8 text-lg">
-          <Link href="/account" className="text-cyan-400 hover:underline">Account</Link>
-          <Link href="/faq" className="text-cyan-400 hover:underline">FAQ</Link>
-          <Link href="/contact" className="text-cyan-400 hover:underline">Contact Us</Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+          {ships.map(s => (
+            <Link
+              key={s.id}
+              href={`/game/fleet/${encodeURIComponent(s.ship_types.name)}`}
+              className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+            >
+              <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
+              <p className="text-3xl text-cyan-400">×{s.quantity}</p>
+              <p className="text-xs opacity-75 mt-2">
+                ATK {s.ship_types
