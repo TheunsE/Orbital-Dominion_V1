@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import type { PlayerBuilding, Resource } from '@/types';
 
 const supabase = createClient();
 
@@ -11,9 +12,8 @@ export default function BuildingPage() {
   const { name } = useParams();
   const buildingName = decodeURIComponent(name as string);
 
-  const [building, setBuilding] = useState<any>(null);
-  const [config, setConfig] = useState<any>(null);
-  const [resources, setResources] = useState<any>({});
+  const [building, setBuilding] = useState<PlayerBuilding | null>(null);
+  const [resources, setResources] = useState<{ metal: number; crystal: number; food: number }>({ metal: 0, crystal: 0, food: 0 });
   const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
@@ -22,83 +22,84 @@ export default function BuildingPage() {
       if (!user) return;
       setUserId(user.id);
 
-      const [bRes, cRes, rRes] = await Promise.all([
-        supabase.from('buildings').select('*').eq('user_id', user.id).eq('name', buildingName).single(),
-        supabase.from('building_configs').select('*').eq('name', buildingName).single(),
-        supabase.from('resources').select('*').eq('user_id', user.id).single()
+      const [bRes, rRes] = await Promise.all([
+        supabase
+          .from('player_buildings')
+          .select('*, building_types(*)')
+          .eq('player_id', user.id)
+          .eq('building_types.name', buildingName)
+          .single(),
+        supabase.from('resources').select('*').eq('player_id', user.id)
       ]);
 
-      setBuilding(bRes.data || { level: 0 });
-      setConfig(cRes.data);
-      setResources(rRes.data || { metal:0, crystal:0, food:0, power:0 });
+      setBuilding(bRes.data);
+      const resMap = (rRes.data as Resource[] || []).reduce((acc, r) => {
+        if (r.resource_type in acc) acc[r.resource_type] = r.quantity;
+        return acc;
+      }, { metal: 0, crystal: 0, food: 0 });
+      setResources(resMap);
     };
     load();
   }, [buildingName]);
 
-  if (!config || building === null) return <div className="text-white p-10">Loading...</div>;
+  if (!building) return <div className="text-white p-10">Loading...</div>;
 
+  const type = building.building_types;
   const nextLevel = building.level + 1;
   const cost = {
-    metal: config.base_cost_metal * nextLevel,
-    crystal: config.base_cost_crystal * nextLevel,
-    food: config.base_cost_food * nextLevel,
-    power: config.base_cost_power * nextLevel,
+    metal: type.cost_metal * nextLevel,
+    crystal: type.cost_crystal * nextLevel,
+    food: type.cost_food * nextLevel,
   };
-  const time = config.build_time_seconds * nextLevel;
 
   const canAfford = resources.metal >= cost.metal &&
                     resources.crystal >= cost.crystal &&
-                    resources.food >= cost.food &&
-                    (cost.power === 0 || resources.power >= cost.power);
+                    resources.food >= cost.food;
 
   const upgrade = async () => {
     if (!canAfford) return;
 
-    await supabase.from('resources').update({
-      metal: resources.metal - cost.metal,
-      crystal: resources.crystal - cost.crystal,
-      food: resources.food - cost.food,
-      power: resources.power - cost.power,
-    }).eq('user_id', userId);
-
-    await supabase.from('buildings').upsert({
-      user_id: userId,
-      name: buildingName,
+    await supabase.from('player_buildings').update({
       level: nextLevel
-    });
+    }).eq('id', building.id);
+
+    // Deduct resources
+    await Promise.all([
+      supabase.from('resources').update({ quantity: resources.metal - cost.metal })
+        .eq('player_id', userId).eq('resource_type', 'metal'),
+      supabase.from('resources').update({ quantity: resources.crystal - cost.crystal })
+        .eq('player_id', userId).eq('resource_type', 'crystal'),
+      supabase.from('resources').update({ quantity: resources.food - cost.food })
+        .eq('player_id', userId).eq('resource_type', 'food'),
+    ]);
 
     setBuilding({ ...building, level: nextLevel });
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-12">
-      <Link href="/game" className="text-cyan-400 hover:underline mb-6 inline-block">&larr; Back to Dashboard</Link>
+      <Link href="/game" className="text-cyan-400 hover:underline mb-6 inline-block">Back to Dashboard</Link>
       <div className="max-w-3xl mx-auto bg-gray-800 rounded-xl p-10">
-        <h1 className="text-5xl font-bold mb-4">{buildingName.replace(/([A-Z])/g, ' $1').trim()}</h1>
-        <p className="text-xl opacity-80 mb-8">{config.description}</p>
+        <h1 className="text-5xl font-bold mb-4">{type.name}</h1>
         <p className="text-7xl mb-10 text-cyan-400">Level {building.level}</p>
 
         <div className="space-y-6 text-xl">
           <h2 className="text-3xl">Upgrade to Level {nextLevel}</h2>
-          <p className="text-lg opacity-75">Build time: {time} seconds</p>
+          <p className="text-lg opacity-75">Time: {type.construction_time_seconds * nextLevel}s</p>
 
-          <div className="space-y-2">
-            {cost.metal > 0 && <div className={resources.metal >= cost.metal ? 'text-green-400' : 'text-red-400'}>Metal: {cost.metal}</div>}
-            {cost.crystal > 0 && <div className={resources.crystal >= cost.crystal ? 'text-green-400' : 'text-red-400'}>Crystal: {cost.crystal}</div>}
-            {cost.food > 0 && <div className={resources.food >= cost.food ? 'text-green-400' : 'text-red-400'}>Food: {cost.food}</div>}
-            {cost.power > 0 && <div className={resources.power >= cost.power ? 'text-green-400' : 'text-red-400'}>Power: {cost.power}</div>}
+          <div className="space-y-3">
+            <div className={resources.metal >= cost.metal ? 'text-green-400' : 'text-red-400'}>Metal: {cost.metal}</div>
+            <div className={resources.crystal >= cost.crystal ? 'text-green-400' : 'text-red-400'}>Crystal: {cost.crystal}</div>
+            <div className={resources.food >= cost.food ? 'text-green-400' : 'text-red-400'}>Food: {cost.food}</div>
           </div>
 
           <button
             onClick={upgrade}
             disabled={!canAfford}
             className={`w-full py-6 text-3xl font-bold rounded-lg transition-all
-              ${canAfford 
-                ? 'bg-cyan-600 hover:bg-cyan-500 text-black shadow-lg shadow-cyan-500/50' 
-                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-              }`}
+              ${canAfford ? 'bg-cyan-600 hover:bg-cyan-500 text-black' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}`}
           >
-            {canAfford ? `Upgrade • ${time}s` : 'Not enough resources'}
+            {canAfford ? `Upgrade • ${type.construction_time_seconds * nextLevel}s` : 'Not enough resources'}
           </button>
         </div>
       </div>
