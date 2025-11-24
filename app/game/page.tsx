@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { PlayerBuilding, PlayerShip, Resource } from '@/types';
@@ -181,4 +181,18 @@ function Dashboard({ userId }: { userId: string }) {
               <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
               <p className="text-3xl text-cyan-400">×{s.quantity}</p>
               <p className="text-xs opacity-75 mt-2">
-                ATK {s.ship_types
+                ATK {s.ship_types.attack} | DEF {s.ship_types.defense} | HP {s.ship_types.hp}
+              </p>
+            </Link>
+          ))}
+        </div>
+
+        <div className="mt-16 text-center space-x-8 text-lg">
+          <Link href="/account" className="text-cyan-400 hover:underline">Account</Link>
+          <Link href="/faq" className="text-cyan-400 hover:underline">FAQ</Link>
+          <Link href="/contact" className="text-cyan-400 hover:underline">Contact Us</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
