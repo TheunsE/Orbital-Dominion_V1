@@ -102,10 +102,16 @@ export default function GamePage() {
 }
 
 // ──────────────────────────────────────
-// DASHBOARD – SHOWS METAL, CRYSTAL, FOOD, POWER CORRECTLY
+// DASHBOARD
 // ──────────────────────────────────────
 function Dashboard({ userId }: { userId: string }) {
   const [resources, setResources] = useState({
+    metal: 0,
+    crystal: 0,
+    food: 0,
+    power: 0,
+  });
+  const [production, setProduction] = useState({
     metal: 0,
     crystal: 0,
     food: 0,
@@ -122,11 +128,14 @@ function Dashboard({ userId }: { userId: string }) {
         { data: shipData },
       ] = await Promise.all([
         supabase.from('resources').select('resource_type, quantity').eq('player_id', userId),
-        supabase.from('player_buildings').select('*, building_types(name)').eq('player_id', userId),
+        supabase
+          .from('player_buildings')
+          .select('level, building_types(name, production_bonus_per_level, power_generation_per_level)')
+          .eq('player_id', userId),
         supabase.from('player_ships').select('*, ship_types(name)').eq('player_id', userId),
       ]);
 
-      // Map all 4 resources correctly
+      // Current resource amounts
       const resMap = { metal: 0, crystal: 0, food: 0, power: 0 };
       (resData || []).forEach((r: any) => {
         if (r.resource_type in resMap) {
@@ -135,6 +144,22 @@ function Dashboard({ userId }: { userId: string }) {
       });
       setResources(resMap);
 
+      // Calculate production per hour
+      const prod = { metal: 0, crystal: 0, food: 0, power: 0 };
+      (buildingData || []).forEach((b: any) => {
+        const lvl = b.level;
+        const type = b.building_types;
+
+        // Production bonuses (Trade Pod, Work Yard, Research Lab)
+        prod.metal   += Math.floor(lvl * (type.production_bonus_per_level || 0));
+        prod.crystal += Math.floor(lvl * (type.production_bonus_per_level || 0));
+        prod.food    += Math.floor(lvl * (type.production_bonus_per_level || 0));
+
+        // Power generation
+        prod.power   += Math.floor(lvl * (type.power_generation_per_level || 0));
+      });
+
+      setProduction(prod);
       setBuildings(buildingData || []);
       setShips(shipData || []);
     };
@@ -147,54 +172,65 @@ function Dashboard({ userId }: { userId: string }) {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-5xl font-bold mb-8 text-cyan-400">Orbital Dominion</h1>
+        <h1 className="text-5xl font-bold mb-8 text-cyan-400 tracking-wider">Orbital Dominion</h1>
 
-        {/* RESOURCES – NOW SHOWS ALL 4 */}
+        {/* RESOURCES + PRODUCTION */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
           {(['metal', 'crystal', 'food', 'power'] as const).map((res) => (
-            <div key={res} className="bg-gray-800 p-6 rounded-lg text-center border border-gray-700">
-              <h3 className="text-lg uppercase tracking-wider">{res}</h3>
-              <p className="text-4xl font-bold mt-2 text-cyan-400">
+            <div
+              key={res}
+              className="bg-gray-800/80 backdrop-blur-sm p-8 rounded-xl border border-gray-700 shadow-2xl"
+            >
+              <h3 className="text-lg uppercase tracking-widest opacity-80">{res}</h3>
+              <p className="text-5xl font-bold mt-3 text-cyan-300">
                 {resources[res].toLocaleString()}
+              </p>
+              <p className="mt-2 text-green-400 text-xl font-medium">
+                +{production[res]}/h
               </p>
             </div>
           ))}
         </div>
 
         {/* BUILDINGS */}
-        <h2 className="text-3xl mb-6 text-cyan-300">Buildings</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
+        <h2 className="text-4xl font-bold mb-8 text-cyan-300">Buildings</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-16">
           {buildings.map((b) => (
             <Link
               key={b.id}
               href={`/game/building/${b.building_type_id}`}
-              className="bg-gray-800 p-8 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+              className="group bg-gray-800/60 backdrop-blur p-10 rounded-2xl border border-gray-700 hover:border-cyan-500 hover:bg-gray-700/70 transition-all duration-300 text-center shadow-xl"
             >
-              <h3 className="text-xl font-bold">{b.building_types.name}</h3>
-              <p className="text-5xl mt-4 text-cyan-400">Lv.{b.level}</p>
+              <h3 className="text-2xl font-bold group-hover:text-cyan-300 transition">
+                {b.building_types.name}
+              </h3>
+              <p className="text-6xl font-extrabold mt-6 text-cyan-400">Lv.{b.level}</p>
             </Link>
           ))}
         </div>
 
         {/* FLEET */}
-        <h2 className="text-3xl mb-6 text-cyan-300">Fleet</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <h2 className="text-4xl font-bold mb-8 text-cyan-300">Fleet</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
           {ships.map((s) => (
             <Link
               key={s.id}
               href={`/game/fleet/${s.ship_type_id}`}
-              className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+              className="group bg-gray-800/60 backdrop-blur p-8 rounded-2xl border border-gray-700 hover:border-cyan-500 hover:bg-gray-700/70 transition-all text-center shadow-xl"
             >
-              <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
-              <p className="text-4xl text-cyan-400">×{s.quantity}</p>
+              <h3 className="text-xl font-bold group-hover:text-cyan-300 transition">
+                {s.ship_types.name}
+              </h3>
+              <p className="text-5xl font-extrabold mt-4 text-cyan-400">×{s.quantity}</p>
             </Link>
           ))}
         </div>
 
-        <div className="mt-16 text-center space-x-8 text-lg">
-          <Link href="/account" className="text-cyan-400 hover:underline">Account</Link>
-          <Link href="/faq" className="text-cyan-400 hover:underline">FAQ</Link>
-          <Link href="/contact" className="text-cyan-400 hover:underline">Contact</Link>
+        {/* Footer links */}
+        <div className="mt-20 text-center space-x-10 text-xl">
+          <Link href="/account" className="text-cyan-400 hover:text-cyan-200 transition">Account</Link>
+          <Link href="/faq" className="text-cyan-400 hover:text-cyan-200 transition">FAQ</Link>
+          <Link href="/contact" className="text-cyan-400 hover:text-cyan-200 transition">Contact</Link>
         </div>
       </div>
     </div>
