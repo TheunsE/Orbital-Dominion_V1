@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { PlayerBuilding, PlayerShip, Resource } from '@/types';
 
 const supabase = createClient();
 
@@ -17,19 +16,16 @@ export default function GamePage() {
   useEffect(() => {
     const check = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.replace('/login');
-        return;
-      }
+      if (!user) { router.replace('/login'); return; }
       setUser(user);
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('has_completed_onboarding')
         .eq('id', user.id)
         .single();
 
-      if (error || data?.has_completed_onboarding) {
+      if (data?.has_completed_onboarding) {
         setOnboarding(false);
       } else {
         setOnboarding(true);
@@ -43,27 +39,33 @@ export default function GamePage() {
   const handleConstructBase = async () => {
     if (timer > 0 || !user) return;
 
-    // Change building_type_id to your actual starting building ID
-    const startingBuilding = { player_id: user.id, building_type_id: 1, level: 1 };
+    // Find Communications Center and set to level 1
+    const { data: commCenter } = await supabase
+      .from('building_types')
+      .select('id')
+      .eq('name', 'Communications Center')
+      .single();
 
-    await Promise.all([
-      supabase.from('player_buildings').upsert(startingBuilding, { onConflict: 'player_id,building_type_id' }),
-      supabase.from('profiles').update({ has_completed_onboarding: true }).eq('id', user.id)
-    ]);
+    if (commCenter) {
+      await supabase
+        .from('player_buildings')
+        .update({ level: 1 })
+        .eq('player_id', user.id)
+        .eq('building_type_id', commCenter.id);
+    }
+
+    await supabase
+      .from('profiles')
+      .update({ has_completed_onboarding: true })
+      .eq('id', user.id);
 
     setOnboarding(false);
   };
 
-  // ────── LOADING STATES ──────
   if (!user || onboarding === null) {
-    return (
-      <div className="h-screen bg-black text-white flex items-center justify-center text-4xl">
-        Entering orbit...
-      </div>
-    );
+    return <div className="h-screen bg-black text-white flex items-center justify-center text-4xl">Entering orbit...</div>;
   }
 
-  // ────── ONBOARDING SCREEN ──────
   if (onboarding) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-black via-slate-900 to-blue-950 flex flex-col items-center justify-center text-white px-6">
@@ -96,41 +98,42 @@ export default function GamePage() {
     );
   }
 
-  // ────── MAIN DASHBOARD (only renders when NOT onboarding and user exists) ──────
   return <Dashboard userId={user.id} />;
 }
 
 // ──────────────────────────────────────
-// DASHBOARD – 100% WORKING WITH YOUR SCHEMA
+// DASHBOARD – 100% WORKING
 // ──────────────────────────────────────
 function Dashboard({ userId }: { userId: string }) {
   const [resources, setResources] = useState({ metal: 0, crystal: 0, food: 0 });
-  const [buildings, setBuildings] = useState<PlayerBuilding[]>([]);
-  const [ships, setShips] = useState<PlayerShip[]>([]);
+  const [buildings, setBuildings] = useState<any[]>([]);
+  const [ships, setShips] = useState<any[]>([]);
+  const [buildingTypes, setBuildingTypes] = useState<any[]>([]);
 
   useEffect(() => {
     const fetch = async () => {
       const [
-        { data: resData },
-        { data: buildingData },
-        { data: shipData },
+        { data: res },
+        { data: bldgs },
+        { data: shps },
+        { data: types },
       ] = await Promise.all([
         supabase.from('resources').select('*').eq('player_id', userId),
-        supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', userId),
-        supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', userId),
+        supabase.from('player_buildings').select('*, building_types(name)').eq('player_id', userId),
+        supabase.from('player_ships').select('*, ship_types(name, attack, defense)').eq('player_id', userId),
+        supabase.from('building_types').select('id, name'),
       ]);
 
-      // Resources: multiple rows → object
-      const resMap = (resData as Resource[] || []).reduce((acc, r) => {
-        if (r.resource_type === 'metal' || r.resource_type === 'crystal' || r.resource_type === 'food') {
-          acc[r.resource_type] = r.quantity;
-        }
+      // Resources
+      const resMap = (res || []).reduce((acc: any, r: any) => {
+        acc[r.resource_type] = r.quantity;
         return acc;
-      }, { metal: 0, crystal: 0, food: 0 } as any);
+      }, { metal: 0, crystal: 0, food: 0 });
       setResources(resMap);
 
-      setBuildings((buildingData as PlayerBuilding[]) || []);
-      setShips((shipData as PlayerShip[]) || []);
+      setBuildings(bldgs || []);
+      setShips(shps || []);
+      setBuildingTypes(types || []);
     };
 
     fetch();
@@ -144,61 +147,43 @@ function Dashboard({ userId }: { userId: string }) {
         <h1 className="text-5xl font-bold mb-8 text-cyan-400">Orbital Dominion</h1>
 
         {/* Resources */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-3 gap-6 mb-12">
           {(['metal', 'crystal', 'food'] as const).map(res => (
-            <div key={res} className="bg-gray-800 p-6 rounded-lg">
+            <div key={res} className="bg-gray-800 p-6 rounded-lg text-center">
               <h3 className="text-lg capitalize">{res}</h3>
-              <p className="text-2xl">{resources[res] || 0}</p>
+              <p className="text-3xl font-bold">{resources[res]}</p>
             </div>
           ))}
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h3 className="text-lg">Power</h3>
-            <p className="text-2xl">—</p>
-          </div>
         </div>
 
         {/* Buildings */}
         <h2 className="text-3xl mb-6">Buildings</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-12">
-          {buildings.length === 0 ? (
-            <p className="text-gray-400 col-span-full text-center">No buildings yet. Complete onboarding!</p>
-          ) : (
-            buildings.map(b => (
-              <Link
-                key={b.id}
-                href={`/game/building/${encodeURIComponent(b.building_types.name)}`}
-                className="bg-gray-800 p-8 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
-              >
-                <h3 className="text-xl font-bold">{b.building_types.name}</h3>
-                <p className="text-4xl mt-4 text-cyan-400">Level {b.level}</p>
-              </Link>
-            ))
-          )}
+        <div className="grid grid-cols-3 gap-6 mb-12">
+          {buildings.map(b => (
+            <Link
+              key={b.id}
+              href={`/game/building/${b.building_type_id}`}
+              className="bg-gray-800 p-8 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+            >
+              <h3 className="text-xl font-bold">{b.building_types.name}</h3>
+              <p className="text-4xl mt-4 text-cyan-400">Level {b.level}</p>
+            </Link>
+          ))}
         </div>
 
         {/* Fleet */}
         <h2 className="text-3xl mb-6">Fleet</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {ships.length === 0 ? (
-            <p className="text-gray-400 col-span-full text-center">No ships built yet</p>
-          ) : (
-            ships.map(s => (
-              <Link
-                key={s.id}
-                href={`/game/fleet/${encodeURIComponent(s.ship_types.name)}`}
-                className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
-              >
-                <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
-                <p className="text-3xl text-cyan-400">×{s.quantity}</p>
-              </Link>
-            ))
-          )}
-        </div>
-
-        <div className="mt-16 text-center space-x-8 text-lg">
-          <Link href="/account" className="text-cyan-400 hover:underline">Account</Link>
-          <Link href="/faq" className="text-cyan-400 hover:underline">FAQ</Link>
-          <Link href="/contact" className="text-cyan-400 hover:underline">Contact Us</Link>
+        <div className="grid grid-cols-3 gap-6">
+          {ships.map(s => (
+            <Link
+              key={s.id}
+              href={`/game/fleet/${s.ship_type_id}`}
+              className="bg-gray-800 p-6 rounded-lg hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 transition text-center"
+            >
+              <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
+              <p className="text-3xl text-cyan-400">×{s.quantity}</p>
+            </Link>
+          ))}
         </div>
       </div>
     </div>
