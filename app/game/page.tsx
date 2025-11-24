@@ -41,83 +41,75 @@ export default function GamePage() {
   }, [])
 
   async function loadData() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        console.warn('No authenticated user')
-        return
-      }
-
-      let { data: player } = await supabase
-        .from('players')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (!player) {
-        console.log('No player found → creating new empire for', user.email)
-
-        const { data: newPlayer, error: createError } = await supabase
-          .from('players')
-          .insert({ user_id: user.id })
-          .select('id')
-          .single()
-
-        if (createError || !newPlayer) {
-          throw new Error('Failed to create player: ' + createError?.message)
-        }
-
-        player = newPlayer
-
-        await supabase.from('resources').insert([
-          { player_id: player.id, resource_type: 'metal', quantity: 500 },
-          { player_id: player.id, resource_type: 'crystal', quantity: 300 },
-          { player_id: player.id, resource_type: 'food', quantity: 200 },
-        ])
-      }
-
-      const [
-        { data: res },
-        { data: blds },
-        { data: types },
-        { data: fleet },
-      ] = await Promise.all([
-        supabase.from('resources').select('*').eq('player_id', player.id),
-        supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', player.id),
-        supabase.from('building_types').select('*'),
-        supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', player.id),
-      ])
-
-      if (blds && blds.length === 0) {
-        setIsNewPlayer(true)
-        setTutorialStep(1) // Start tutorial
-      } else if (blds) {
-        // Based on buildings, determine the next logical tutorial step
-        const hasMine = blds.some(b => b.building_types.name === 'Metal Mine')
-        const hasExtractor = blds.some(b => b.building_types.name === 'Crystal Extractor')
-        const hasFarm = blds.some(b => b.building_types.name === 'Hydroponics Farm')
-        const hasPlant = blds.some(b => b.building_types.name === 'Solar Plant')
-        const hasDepot = blds.some(b => b.building_types.name === 'Storage Depot')
-
-        if (hasShelter && !hasMine) setTutorialStep(2)
-        else if (hasMine && !hasExtractor) setTutorialStep(3)
-        else if (hasExtractor && !hasFarm) setTutorialStep(4)
-        else if (hasFarm && !hasPlant) setTutorialStep(5)
-        else if (hasPlant && !hasDepot) setTutorialStep(6)
-        else setTutorialStep(0) // Completed
-      }
-
-
-      setResources(res || [])
-      setBuildings(blds || [])
-      setBuildingTypes(types || [])
-      setShips(fleet || [])
-
-    } catch (err: any)      console.error('Critical error in loadData:', err)
-    } finally {
-      setIsLoading(false)
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      console.warn('No authenticated user')
+      return
     }
+
+    // CORRECTED: Use the player's ID directly (same as user ID)
+    const playerId = user.id
+
+    let { data: player } = await supabase
+      .from('players')
+      .select('id')
+      .eq('id', playerId) // CORRECTED: Use 'id' not 'user_id'
+      .maybeSingle()
+
+    if (!player) {
+      console.log('No player found → waiting for trigger to create player')
+      // The trigger should create the player automatically
+      setIsLoading(false)
+      return
+    }
+
+    const [
+      { data: res },
+      { data: blds },
+      { data: types },
+      { data: fleet },
+    ] = await Promise.all([
+      supabase.from('resources').select('*').eq('player_id', playerId),
+      supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', playerId),
+      supabase.from('building_types').select('*'),
+      supabase.from('player_ships').select('*, ship_types(*)').eq('player_id', playerId),
+    ])
+
+    // Check if this is a new player (no buildings)
+    if (blds && blds.length === 0) {
+      setIsNewPlayer(true)
+      setTutorialStep(1) // Start tutorial
+    } else if (blds) {
+      // Tutorial progression based on actual building names
+      const hasShelter = blds.some(b => b.building_types.name === 'Shelter')
+      const hasMine = blds.some(b => b.building_types.name === 'Metal Mine')
+      const hasExtractor = blds.some(b => b.building_types.name === 'Crystal Extractor')
+      const hasFarm = blds.some(b => b.building_types.name === 'Hydroponics Farm')
+      const hasPlant = blds.some(b => b.building_types.name === 'Solar Plant')
+      const hasDepot = blds.some(b => b.building_types.name === 'Storage Depot')
+
+      if (!hasShelter) setTutorialStep(1)
+      else if (hasShelter && !hasMine) setTutorialStep(2)
+      else if (hasMine && !hasExtractor) setTutorialStep(3)
+      else if (hasExtractor && !hasFarm) setTutorialStep(4)
+      else if (hasFarm && !hasPlant) setTutorialStep(5)
+      else if (hasPlant && !hasDepot) setTutorialStep(6)
+      else setTutorialStep(0) // Completed
+    }
+
+    setResources(res || [])
+    setBuildings(blds || [])
+    setBuildingTypes(types || [])
+    setShips(fleet || [])
+
+  } catch (err: any) {
+    console.error('Critical error in loadData:', err)
+    setAlerts(['Failed to load game data. Please refresh the page.'])
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleTutorialAdvance = () => {
     // This will be called after a building is constructed
@@ -152,7 +144,7 @@ export default function GamePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
       <header className="bg-slate-900/90 backdrop-blur border-b border-cyan-600/30">
-        <div className="max-w-7xl mx-auto px-6 py_5 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
             Orbital Dominion
           </h1>
