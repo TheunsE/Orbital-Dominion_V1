@@ -231,17 +231,6 @@ function Dashboard({ userId }: { userId: string }) {
               );
             })}
           </div>
-
-          {/* FLEET */}
-          <h2 className="text-4xl font-bold mb-8 text-cyan-300">Fleet</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-            {ships.map((s) => (
-              <Link key={s.id} href={`/game/fleet/${s.ship_type_id}`} className="p-8 rounded-2xl border border-gray-700 hover:border-cyan-500 bg-gray-800/80 backdrop-blur text-center transition">
-                <h3 className="text-xl font-bold">{s.ship_types.name}</h3>
-                <p className="text-5xl font-extrabold mt-4 text-cyan-400">×{s.quantity}</p>
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
     </div>
