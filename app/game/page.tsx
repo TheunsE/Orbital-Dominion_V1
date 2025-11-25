@@ -68,7 +68,7 @@ export default function GamePage() {
   if (!user || onboarding === null)
     return (
       <div className="h-screen bg-black text-white flex items-center justify-center text-4xl">
-        Loading...
+        Entering orbit...
       </div>
     );
 
@@ -78,7 +78,9 @@ export default function GamePage() {
         <div className="max-w-4xl text-center space-y-8">
           <h1 className="text-5xl font-bold mb-10 text-cyan-400">Welcome, Commander.</h1>
           <p className="text-xl leading-relaxed">
-            <strong className="text-2xl text-cyan-300">Construct Communications Center</strong>
+            Your colony ship has emerged from hyperspace above an unclaimed world.<br />
+            With limited supplies, your first task is critical:<br />
+            <strong className="text-2xl text-cyan-300">Establish a Colonial Command Base.</strong>
           </p>
           <button
             onClick={handleConstructBase}
@@ -86,10 +88,10 @@ export default function GamePage() {
             className={`mt-16 px-12 py-6 text-2xl font-bold rounded-lg transition-all ${
               timer > 0
                 ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                : 'bg-cyan-600 hover:bg-cyan-500 text-black shadow-2xl shadow-cyan-500/50'
+                : 'bg-cyan-600 hover:bg-cyan-500 text-black animate-pulse shadow-2xl shadow-cyan-500/50'
             }`}
           >
-            {timer > 0 ? `Constructing... (${timer}s)` : 'Construct Base'}
+            {timer > 0 ? `Construct Colonial Command Base (${timer}s)` : 'Construct Colonial Command Base'}
           </button>
         </div>
       </div>
@@ -100,7 +102,7 @@ export default function GamePage() {
 }
 
 // ──────────────────────────────────────
-// DASHBOARD – FINAL, WORKING, NO ERRORS
+// FINAL DASHBOARD – EVERYTHING FIXED
 // ──────────────────────────────────────
 function Dashboard({ userId }: { userId: string }) {
   const [resources, setResources] = useState({ metal: 0, crystal: 0, food: 0, power: 0 });
@@ -122,7 +124,7 @@ function Dashboard({ userId }: { userId: string }) {
           .order('construction_ends_at'),
       ]);
 
-      // Resources — Type-safe
+      // Resources
       const resMap = { metal: 0, crystal: 0, food: 0, power: 0 };
       (res || []).forEach((r: any) => {
         const key = r.resource_type as keyof typeof resMap;
@@ -147,10 +149,7 @@ function Dashboard({ userId }: { userId: string }) {
 
       // Timer
       if (q && q[0]?.construction_ends_at) {
-        const diff = Math.max(
-          0,
-          Math.floor((new Date(q[0].construction_ends_at).getTime() - Date.now()) / 1000)
-        );
+        const diff = Math.max(0, Math.floor((new Date(q[0].construction_ends_at).getTime() - Date.now()) / 1000));
         setTimeLeft(diff);
       } else {
         setTimeLeft(0);
@@ -172,11 +171,14 @@ function Dashboard({ userId }: { userId: string }) {
   const getBuildingId = (name: string) =>
     buildings.find((b) => b.building_types.name === name)?.building_type_id;
 
+  // Only show non-production buildings in the grid
+  const facilityBuildings = buildings.filter(b => !['Metal Mine', 'Crystal Mine', 'Food Synthesizer', 'Solar Plant'].includes(b.building_types.name));
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
 
-        {/* BUILD QUEUE BAR */}
+        {/* BUILD QUEUE */}
         {queue.length > 0 && (
           <div className="fixed top-0 left-0 right-0 bg-black/95 border-b-4 border-orange-500 p-4 z-50">
             <div className="max-w-4xl mx-auto flex justify-between items-center">
@@ -191,60 +193,42 @@ function Dashboard({ userId }: { userId: string }) {
         <div className={queue.length > 0 ? 'mt-24' : ''}>
           <h1 className="text-6xl font-bold text-center mb-12 text-cyan-400">Orbital Dominion</h1>
 
-          {/* CLICKABLE RESOURCES */}
+          {/* CLICKABLE RESOURCES (with links to mines/plants) */}
+          <h2 className="text-4xl font-bold mb-8 text-cyan-300">Resourcess</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
-            <Link
-              href={`/game/building/${getBuildingId('Metal Mine') || ''}`}
-              className="bg-gradient-to-br from-orange-900 to-red-900 p-8 rounded-2xl border-2 border-orange-600 hover:border-orange-400 transition cursor-pointer"
-            >
+            <Link href={`/game/building/${getBuildingId('Metal Mine') || ''}`} className="bg-gradient-to-br from-orange-900 to-red-900 p-8 rounded-2xl border-2 border-orange-600 hover:border-orange-400 transition cursor-pointer">
               <h3 className="text-2xl font-bold">Metal</h3>
               <p className="text-5xl font-extrabold">{resources.metal.toLocaleString()}</p>
               <p className="text-green-400">+{production.metal}/h</p>
             </Link>
-
-            <Link
-              href={`/game/building/${getBuildingId('Crystal Mine') || ''}`}
-              className="bg-gradient-to-br from-purple-900 to-indigo-900 p-8 rounded-2xl border-2 border-purple-600 hover:border-purple-400 transition cursor-pointer"
-            >
+            <Link href={`/game/building/${getBuildingId('Crystal Mine') || ''}`} className="bg-gradient-to-br from-purple-900 to-indigo-900 p-8 rounded-2xl border-2 border-purple-600 hover:border-purple-400 transition cursor-pointer">
               <h3 className="text-2xl font-bold">Crystal</h3>
               <p className="text-5xl font-extrabold">{resources.crystal.toLocaleString()}</p>
               <p className="text-green-400">+{production.crystal}/h</p>
             </Link>
-
-            <Link
-              href={`/game/building/${getBuildingId('Food Synthesizer') || ''}`}
-              className="bg-gradient-to-br from-green-900 to-emerald-900 p-8 rounded-2xl border-2 border-green-600 hover:border-green-400 transition cursor-pointer"
-            >
+            <Link href={`/game/building/${getBuildingId('Food Synthesizer') || ''}`} className="bg-gradient-to-br from-green-900 to-emerald-900 p-8 rounded-2xl border-2 border-green-600 hover:border-green-400 transition cursor-pointer">
               <h3 className="text-2xl font-bold">Food</h3>
               <p className="text-5xl font-extrabold">{resources.food.toLocaleString()}</p>
               <p className="text-green-400">+{production.food}/h</p>
             </Link>
-
-            <Link
-              href={`/game/building/${getBuildingId('Solar Plant') || ''}`}
-              className="bg-gradient-to-br from-yellow-900 to-amber-900 p-8 rounded-2xl border-2 border-yellow-600 hover:border-yellow-400 transition cursor-pointer"
-            >
+            <Link href={`/game/building/${getBuildingId('Solar Plant') || ''}`} className="bg-gradient-to-br from-yellow-900 to-amber-900 p-8 rounded-2xl border-2 border-yellow-600 hover:border-yellow-400 transition cursor-pointer">
               <h3 className="text-2xl font-bold">Power</h3>
               <p className="text-5xl font-extrabold">{resources.power.toLocaleString()}</p>
               <p className="text-green-400">+{production.power}/h</p>
             </Link>
           </div>
 
-          {/* BUILDINGS */}
-          <h2 className="text-4xl font-bold mb-8 text-cyan-300">Facilities</h2>
+          {/* BUILDINGS) */}
+          <h2 className="text-4xl font-bold mb-8 text-cyan-300">Buildings</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {buildings.map((b) => {
+            {facilityBuildings.map((b) => {
               const name = b.building_types.name;
               const isWorkYard = name === 'Work Yard';
               const isBuilding = queue.some((q: any) => q.building_type_id === b.building_type_id);
 
               if (isWorkYard) {
                 return (
-                  <Link
-                    key={b.id}
-                    href="/game/fleet"
-                    className="bg-gradient-to-br from-purple-800 to-cyan-800 p-10 rounded-2xl border-4 border-purple-500 text-center shadow-2xl"
-                  >
+                  <Link key={b.id} href="/game/fleet" className="bg-gradient-to-br from-purple-800 to-cyan-800 p-10 rounded-2xl border-4 border-purple-500 text-center shadow-2xl">
                     <h3 className="text-3xl font-bold text-purple-300">Work Yard</h3>
                     <p className="text-7xl font-extrabold text-white">Lv.{b.level}</p>
                     <p className="text-xl text-cyan-300">Shipyard</p>
