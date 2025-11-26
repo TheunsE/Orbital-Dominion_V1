@@ -15,18 +15,16 @@ export default function GamePage() {
 
   useEffect(() => {
     const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         router.replace('/login');
         return;
       }
       setUser(user);
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('has_completed_onboarding')
-        .eq('id', user.id)
-        .single();
+      const { data } = await supabase.from('profiles').select('has_completed_onboarding').eq('id', user.id).single();
 
       if (data?.has_completed_onboarding) {
         setOnboarding(false);
@@ -42,11 +40,9 @@ export default function GamePage() {
   const handleConstructBase = async () => {
     if (timer > 0 || !user) return;
 
-    const { data: commCenter } = await supabase
-      .from('building_types')
-      .select('id')
-      .eq('name', 'Communications Center')
-      .single();
+    // This is part of the tutorial and doesn't use the new queue system.
+    // It's a one-off action.
+    const { data: commCenter } = await supabase.from('building_types').select('id').eq('name', 'Communications Center').single();
 
     if (commCenter) {
       const endsAt = new Date(Date.now() + 30_000).toISOString();
@@ -57,10 +53,7 @@ export default function GamePage() {
         .eq('building_type_id', commCenter.id);
     }
 
-    await supabase
-      .from('profiles')
-      .update({ has_completed_onboarding: true })
-      .eq('id', user.id);
+    await supabase.from('profiles').update({ has_completed_onboarding: true }).eq('id', user.id);
 
     setOnboarding(false);
   };
@@ -78,8 +71,10 @@ export default function GamePage() {
         <div className="max-w-4xl text-center space-y-8">
           <h1 className="text-5xl font-bold mb-10 text-cyan-400">Welcome, Commander.</h1>
           <p className="text-xl leading-relaxed">
-            Your colony ship has emerged from hyperspace above an unclaimed world.<br />
-            With limited supplies, your first task is critical:<br />
+            Your colony ship has emerged from hyperspace above an unclaimed world.
+            <br />
+            With limited supplies, your first task is critical:
+            <br />
             <strong className="text-2xl text-cyan-300">Establish a Colonial Command Base.</strong>
           </p>
           <button
@@ -101,9 +96,6 @@ export default function GamePage() {
   return <Dashboard userId={user.id} />;
 }
 
-// ──────────────────────────────────────
-// FINAL DASHBOARD – EVERYTHING FIXED
-// ──────────────────────────────────────
 function Dashboard({ userId }: { userId: string }) {
   const [resources, setResources] = useState({ metal: 0, crystal: 0, food: 0, power: 0 });
   const [production, setProduction] = useState({ metal: 0, crystal: 0, food: 0, power: 0 });
@@ -111,90 +103,104 @@ function Dashboard({ userId }: { userId: string }) {
   const [queue, setQueue] = useState<any[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
 
+  const fetchData = async () => {
+    const [{ data: res }, { data: bldgs }, { data: q }] = await Promise.all([
+      supabase.from('resources').select('resource_type, quantity').eq('player_id', userId),
+      supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', userId),
+      supabase
+        .from('building_queue')
+        .select('*, player_buildings(*, building_types(name))')
+        .eq('player_id', userId)
+        .order('ends_at', { ascending: true }),
+    ]);
+
+    // Resources
+    const resMap = { metal: 0, crystal: 0, food: 0, power: 0 };
+    (res || []).forEach((r: any) => {
+      const key = r.resource_type as keyof typeof resMap;
+      if (key in resMap) resMap[key] = r.quantity;
+    });
+    setResources(resMap);
+
+    // Production
+    const prod = { metal: 0, crystal: 0, food: 0, power: 0 };
+    (bldgs || []).forEach((b: any) => {
+      const name = b.building_types.name;
+      const level = b.level;
+      if (name === 'Metal Mine') prod.metal = 30 + level * 30;
+      if (name === 'Crystal Mine') prod.crystal = 20 + level * 20;
+      if (name === 'Food Synthesizer') prod.food = 15 + level * 15;
+      if (name === 'Solar Plant') prod.power = 20 + level * 20;
+    });
+    setProduction(prod);
+
+    setBuildings(bldgs || []);
+    setQueue(q || []);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const [{ data: res }, { data: bldgs }, { data: q }] = await Promise.all([
-        supabase.from('resources').select('resource_type, quantity').eq('player_id', userId),
-        supabase.from('player_buildings').select('*, building_types(*)').eq('player_id', userId),
-        supabase
-          .from('player_buildings')
-          .select('*, building_types(name)')
-          .eq('player_id', userId)
-          .not('construction_ends_at', 'is', null)
-          .order('construction_ends_at'),
-      ]);
+    fetchData();
+  }, [userId]);
 
-      // Resources
-      const resMap = { metal: 0, crystal: 0, food: 0, power: 0 };
-      (res || []).forEach((r: any) => {
-        const key = r.resource_type as keyof typeof resMap;
-        if (key in resMap) resMap[key] = r.quantity;
-      });
-      setResources(resMap);
+  useEffect(() => {
+    if (queue.length === 0) {
+      setTimeLeft(0);
+      return;
+    }
 
-      // Production
-      const prod = { metal: 0, crystal: 0, food: 0, power: 0 };
-      (bldgs || []).forEach((b: any) => {
-        const name = b.building_types.name;
-        const level = b.level;
-        if (name === 'Metal Mine') prod.metal = 30 + level * 30;
-        if (name === 'Crystal Mine') prod.crystal = 20 + level * 20;
-        if (name === 'Food Synthesizer') prod.food = 15 + level * 15;
-        if (name === 'Solar Plant') prod.power = 20 + level * 20;
-      });
-      setProduction(prod);
+    const firstItem = queue[0];
+    const updateTimer = () => {
+      const diff = Math.max(0, Math.floor((new Date(firstItem.ends_at).getTime() - Date.now()) / 1000));
+      setTimeLeft(diff);
 
-      setBuildings(bldgs || []);
-      setQueue(q || []);
-
-      // Timer
-      if (q && q[0]?.construction_ends_at) {
-        const diff = Math.max(0, Math.floor((new Date(q[0].construction_ends_at).getTime() - Date.now()) / 1000));
-        setTimeLeft(diff);
-      } else {
-        setTimeLeft(0);
+      if (diff === 0) {
+        // Time to refetch data as the building should be done
+        fetchData();
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 1000);
+    updateTimer(); // Initial call
+    const interval = setInterval(updateTimer, 1000);
+
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [queue, userId]);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
-    return `${h ? h + 'h ' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${h > 0 ? h + 'h ' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const getBuildingId = (name: string) =>
-    buildings.find((b) => b.building_types.name === name)?.building_type_id;
+  const getBuildingId = (name: string) => buildings.find(b => b.building_types.name === name)?.building_type_id;
 
-  // Only show non-production buildings in the grid
   const facilityBuildings = buildings.filter(b => !['Metal Mine', 'Crystal Mine', 'Food Synthesizer', 'Solar Plant'].includes(b.building_types.name));
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
-
-        {/* BUILD QUEUE */}
         {queue.length > 0 && (
           <div className="fixed top-0 left-0 right-0 bg-black/95 border-b-4 border-orange-500 p-4 z-50">
-            <div className="max-w-4xl mx-auto flex justify-between items-center">
-              <span className="text-orange-400 font-bold text-xl">
-                Building: {queue[0].building_types.name} → Level {queue[0].level + 1}
-              </span>
-              <span className="text-3xl font-mono text-orange-300">{formatTime(timeLeft)}</span>
+            <div className="max-w-4xl mx-auto flex flex-col space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-orange-400 font-bold text-xl">
+                  Upgrading: {queue[0].player_buildings.building_types.name} → Level {queue[0].target_level}
+                </span>
+                <span className="text-3xl font-mono text-orange-300">{formatTime(timeLeft)}</span>
+              </div>
+              {queue.length > 1 && (
+                 <div className="text-gray-400">
+                   Next in queue: {queue[1].player_buildings.building_types.name} → Level {queue[1].target_level}
+                 </div>
+              )}
             </div>
           </div>
         )}
 
-        <div className={queue.length > 0 ? 'mt-24' : ''}>
+        <div className={queue.length > 0 ? 'mt-32' : ''}>
           <h1 className="text-6xl font-bold text-center mb-12 text-cyan-400">Orbital Dominion</h1>
 
-          {/* CLICKABLE RESOURCES (with links to mines/plants) */}
-          <h2 className="text-4xl font-bold mb-8 text-cyan-300">Resourcess</h2>
+          <h2 className="text-4xl font-bold mb-8 text-cyan-300">Resources</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
             <Link href={`/game/building/${getBuildingId('Metal Mine') || ''}`} className="bg-gradient-to-br from-orange-900 to-red-900 p-8 rounded-2xl border-2 border-orange-600 hover:border-orange-400 transition cursor-pointer">
               <h3 className="text-2xl font-bold">Metal</h3>
@@ -218,13 +224,12 @@ function Dashboard({ userId }: { userId: string }) {
             </Link>
           </div>
 
-          {/* BUILDINGS) */}
           <h2 className="text-4xl font-bold mb-8 text-cyan-300">Buildings</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {facilityBuildings.map((b) => {
+            {facilityBuildings.map(b => {
               const name = b.building_types.name;
               const isWorkYard = name === 'Work Yard';
-              const isBuilding = queue.some((q: any) => q.building_type_id === b.building_type_id);
+              const isInQueue = queue.some((q: any) => q.building_id === b.id);
 
               if (isWorkYard) {
                 return (
@@ -241,12 +246,12 @@ function Dashboard({ userId }: { userId: string }) {
                   key={b.id}
                   href={`/game/building/${b.building_type_id}`}
                   className={`relative p-10 rounded-2xl border-2 transition-all ${
-                    isBuilding ? 'border-orange-500 animate-pulse' : 'border-gray-700 hover:border-cyan-500'
+                    isInQueue ? 'border-orange-500 animate-pulse' : 'border-gray-700 hover:border-cyan-500'
                   } bg-gray-800/80 backdrop-blur text-center`}
                 >
-                  {isBuilding && (
+                  {isInQueue && (
                     <div className="absolute -top-3 -right-3 bg-orange-500 text-black px-3 py-1 rounded-full text-xs font-bold">
-                      BUILDING
+                      QUEUED
                     </div>
                   )}
                   <h3 className="text-2xl font-bold">{name}</h3>
