@@ -157,6 +157,8 @@ CREATE TABLE public.building_queue (
 );
 
 -- 6. Enqueue upgrade (fixed)
+DROP FUNCTION IF EXISTS public.enqueue_building_upgrade(uuid, integer);
+
 CREATE OR REPLACE FUNCTION public.enqueue_building_upgrade(p_player_id uuid, p_building_id integer)
 RETURNS json AS $$
 DECLARE
@@ -171,21 +173,32 @@ DECLARE
   start_time timestamptz;
   end_time timestamptz;
 BEGIN
-  SELECT level, building_type_id INTO current_level, building_type_id
-  FROM public.player_buildings WHERE id = p_building_id AND player_id = p_player_id;
+  -- This line was ambiguous — fixed with pb prefix
+  SELECT pb.level, pb.building_type_id 
+    INTO current_level, building_type_id
+  FROM public.player_buildings pb 
+  WHERE pb.id = p_building_id AND pb.player_id = p_player_id;
 
-  IF current_level IS NULL THEN RETURN json_build_object('error','Not owned'); END IF;
+  IF current_level IS NULL THEN 
+    RETURN json_build_object('error','Building not owned'); 
+  END IF;
 
+  -- Calculate target level
   SELECT current_level + COUNT(*) + 1 INTO target_level
-  FROM public.building_queue WHERE building_id = p_building_id;
+  FROM public.building_queue 
+  WHERE building_id = p_building_id;
 
-  SELECT * INTO bt FROM public.building_types WHERE id = building_type_id;
+  -- Get building type data
+  SELECT * INTO bt 
+  FROM public.building_types 
+  WHERE id = building_type_id;
 
   cost_metal   := bt.cost_metal   * target_level;
   cost_crystal := bt.cost_crystal * target_level;
   cost_food    := bt.cost_food    * target_level;
   construction_time := bt.construction_time_seconds;
 
+  -- Check resources
   SELECT quantity INTO current_metal   FROM public.resources WHERE player_id = p_player_id AND resource_type='metal';
   SELECT quantity INTO current_crystal FROM public.resources WHERE player_id = p_player_id AND resource_type='crystal';
   SELECT quantity INTO current_food    FROM public.resources WHERE player_id = p_player_id AND resource_type='food';
@@ -194,20 +207,25 @@ BEGIN
     RETURN json_build_object('error','Not enough resources');
   END IF;
 
+  -- Deduct resources
   UPDATE public.resources SET quantity = quantity - cost_metal   WHERE player_id = p_player_id AND resource_type='metal';
   UPDATE public.resources SET quantity = quantity - cost_crystal WHERE player_id = p_player_id AND resource_type='crystal';
   UPDATE public.resources SET quantity = quantity - cost_food    WHERE player_id = p_player_id AND resource_type='food';
 
-  SELECT ends_at INTO last_queue_ends FROM public.building_queue
-  WHERE player_id = p_player_id ORDER BY ends_at DESC LIMIT 1;
+  -- Queue timing
+  SELECT ends_at INTO last_queue_ends 
+  FROM public.building_queue 
+  WHERE player_id = p_player_id 
+  ORDER BY ends_at DESC LIMIT 1;
 
   start_time := COALESCE(last_queue_ends, now());
   end_time   := start_time + (construction_time * interval '1 second');
 
+  -- Add to queue
   INSERT INTO public.building_queue (player_id, building_id, target_level, ends_at)
   VALUES (p_player_id, p_building_id, target_level, end_time);
 
-  RETURN json_build_object('success',true,'ends_at',end_time);
+  RETURN json_build_object('success',true,'ends_at',end_time,'target_level',target_level);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
