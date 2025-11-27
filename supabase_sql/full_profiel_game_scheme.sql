@@ -248,32 +248,27 @@ RETURNS void AS $$
 DECLARE
   rec record;
   minutes_passed real;
+  last_update timestamptz;
   prod_metal real;
   prod_crystal real;
   prod_food real;
   prod_power integer;
-  last_update timestamptz;
 BEGIN
-  -- Loop over every player
-  FOR rec IN SELECT DISTINCT player_id FROM public.players LOOP
+  -- Loop over every player using the correct column: id
+  FOR rec IN SELECT id AS player_id FROM public.players LOOP
 
-    -- Get the last update time (same for all resources, so use metal as reference)
+    -- Get last update time (use metal row as reference – it's always there)
     SELECT last_updated INTO last_update
     FROM public.resources
     WHERE player_id = rec.player_id AND resource_type = 'metal';
 
-    -- If no last_updated (should never happen), use now()
     last_update := COALESCE(last_update, now());
-
-    -- How many minutes have passed since last update
     minutes_passed := EXTRACT(EPOCH FROM (now() - last_update)) / 60.0;
 
-    -- Skip if less than 0.1 minute (avoid tiny updates)
-    IF minutes_passed < 0.1 THEN
-      CONTINUE;
-    END IF;
+    -- Skip if less than 6 seconds passed (avoid spam)
+    IF minutes_passed < 0.1 THEN CONTINUE; END IF;
 
-    -- METAL
+    -- === METAL ===
     SELECT COALESCE(SUM(pb.level * bt.production_metal_per_hour), 0) INTO prod_metal
     FROM public.player_buildings pb
     JOIN public.building_types bt ON pb.building_type_id = bt.id
@@ -284,7 +279,7 @@ BEGIN
         last_updated = now()
     WHERE player_id = rec.player_id AND resource_type = 'metal';
 
-    -- CRYSTAL 
+    -- === CRYSTAL ===
     SELECT COALESCE(SUM(pb.level * bt.production_crystal_per_hour), 0) INTO prod_crystal
     FROM public.player_buildings pb
     JOIN public.building_types bt ON pb.building_type_id = bt.id
@@ -295,7 +290,7 @@ BEGIN
         last_updated = now()
     WHERE player_id = rec.player_id AND resource_type = 'crystal';
 
-    -- FOOD 
+    -- === FOOD ===
     SELECT COALESCE(SUM(pb.level * bt.production_food_per_hour), 0) INTO prod_food
     FROM public.player_buildings pb
     JOIN public.building_types bt ON pb.building_type_id = bt.id
@@ -306,7 +301,7 @@ BEGIN
         last_updated = now()
     WHERE player_id = rec.player_id AND resource_type = 'food';
 
-    -- POWER
+    -- === POWER ===
     SELECT COALESCE(SUM(pb.level * bt.power_generation_per_hour), 0) INTO prod_power
     FROM public.player_buildings pb
     JOIN public.building_types bt ON pb.building_type_id = bt.id
