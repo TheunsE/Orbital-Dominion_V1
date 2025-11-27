@@ -266,3 +266,93 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- DONE
+
+-- 9. Building Queue Table
+CREATE TABLE IF NOT EXISTS public.building_queue (
+  id serial PRIMARY KEY,
+  player_id uuid NOT NULL REFERENCES public.players(id) ON DELETE CASCADE,
+  building_id integer NOT NULL REFERENCES public.player_buildings(id) ON DELETE CASCADE,
+  target_level integer NOT NULL,
+  ends_at timestamptz NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(building_id, target_level) -- A building can only be queued for a specific level once
+);
+
+-- 10. RPC function for starting an upgrade
+CREATE OR REPLACE FUNCTION public.enqueue_building_upgrade(
+  p_player_id uuid,
+  p_building_id integer
+)
+RETURNS json AS $$
+DECLARE
+  current_level integer;
+  building_type_id integer;
+  cost_metal integer;
+  cost_crystal integer;
+  cost_food integer;
+  construction_time_seconds integer;
+  current_metal integer;
+  current_crystal integer;
+  current_food integer;
+  last_in_queue public.building_queue;
+  target_level integer;
+  start_time timestamptz;
+  end_time timestamptz;
+BEGIN
+  -- Get building details
+  SELECT pb.level, pb.building_type_id INTO current_level, building_type_id
+  FROM public.player_buildings pb
+  WHERE pb.id = p_building_id AND pb.player_id = p_player_id;
+
+  -- Determine target level (current level + number of items already in queue for this building)
+  SELECT current_level + 1 + count(*) INTO target_level
+  FROM public.building_queue
+  WHERE building_id = p_building_id;
+
+  -- Get building type costs and time
+  SELECT
+    bt.cost_metal * target_level,
+    bt.cost_crystal * target_level,
+    bt.cost_food * target_level,
+    bt.construction_time_seconds
+  INTO cost_metal, cost_crystal, cost_food, construction_time_seconds
+  FROM public.building_types bt
+  WHERE bt.id = building_type_id;
+
+  -- Check player resources
+  SELECT quantity INTO current_metal FROM public.resources WHERE player_id = p_player_id AND resource_type = 'metal';
+  SELECT quantity INTO current_crystal FROM public.resources WHERE player_id = p_player_id AND resource_type = 'crystal';
+  SELECT quantity INTO current_food FROM public.resources WHERE player_id = p_player_id AND resource_type = 'food';
+
+  IF current_metal < cost_metal OR current_crystal < cost_crystal OR current_food < cost_food THEN
+    RETURN json_build_object('error', 'Not enough resources');
+  END IF;
+
+  -- Deduct resources
+  -- This should be a single transaction
+  UPDATE public.resources SET quantity = quantity - cost_metal WHERE player_id = p_player_id AND resource_type = 'metal';
+  UPDATE public.resources SET quantity = quantity - cost_crystal WHERE player_id = p_player_id AND resource_type = 'crystal';
+  UPDATE public.resources SET quantity = quantity - cost_food WHERE player_id = p_player_id AND resource_type = 'food';
+
+  -- Calculate start and end times
+  SELECT * INTO last_in_queue
+  FROM public.building_queue
+  WHERE player_id = p_player_id
+  ORDER BY ends_at DESC
+  LIMIT 1;
+
+  IF last_in_queue IS NULL THEN
+    start_time := now();
+  ELSE
+    start_time := last_in_queue.ends_at;
+  END IF;
+
+  end_time := start_time + (construction_time_seconds * interval '1 second');
+
+  -- Insert into queue
+  INSERT INTO public.building_queue (player_id, building_id, target_level, ends_at)
+  VALUES (p_player_id, p_building_id, target_level, end_time);
+
+  RETURN json_build_object('success', true);
+END;
+$$ LANGUAGE plpgsql;
